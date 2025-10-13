@@ -1,103 +1,95 @@
 import Image from "next/image";
+import Link from "next/link";
 
 export default function Home() {
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
+    <main className="min-h-screen bg-white text-gray-900">
+      {/* HERO */}
+      <section className="relative">
         <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
+          src="/hero/hero.jpg"
+          alt="Lakeside wedding at Forrester Fields"
+          width={2400}
+          height={1400}
           priority
+          className="h-[70vh] w-full object-cover"
         />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+        <div className="absolute inset-0 bg-black/40" />
+        <div className="absolute inset-0 flex items-center justify-center text-center px-6">
+          <div className="max-w-3xl text-white">
+            <h1 className="text-4xl md:text-6xl font-semibold">
+              Lakeside Weddings in Loganville, Georgia
+            </h1>
+            <p className="mt-4 text-lg md:text-xl">
+              A serene private venue with full-service planning and on-call wedding staff.
+            </p>
+            <div className="mt-6 flex items-center justify-center gap-3">
+              <Link href="/contact" className="px-5 py-3 bg-white text-gray-900 rounded-md">
+                Schedule a Tour
+              </Link>
+              <Link href="/services" className="px-5 py-3 border border-white/80 text-white rounded-md">
+                View Packages
+              </Link>
+            </div>
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+      </section>
+
+      {/* VALUE PROPS */}
+      <section className="mx-auto max-w-6xl px-6 py-14 grid gap-6 md:grid-cols-3">
+        {[
+          ["Lakeside Ceremony", "Say “I do” beside the water under market lights."],
+          ["Planning to Day-Of", "From full planning to month-of and day-of coordination."],
+          ["Easy Booking", "Fast date checks and private tour scheduling."]
+        ].map(([title, blurb]) => (
+          <div key={title} className="rounded-xl border p-6 shadow-sm">
+            <h3 className="text-xl font-semibold">{title}</h3>
+            <p className="mt-2 text-gray-600">{blurb}</p>
+          </div>
+        ))}
+      </section>
+
+      {/* GALLERY PREVIEW */}
+      <section className="mx-auto max-w-6xl px-6 pb-12">
+        <h2 className="text-2xl md:text-3xl font-semibold">Gallery</h2>
+        <p className="text-gray-600 mt-2">A peek at recent weddings at Forrester Fields.</p>
+        <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-3">
+          {["g1.webp","g2.webp","g3.webp","g4.webp","g5.webp","g6.webp","g7.webp","g8.webp"].map((f,i)=>(
+            <Image key={i} src={`/gallery/${f}`} alt={`Wedding ${i+1}`} width={800} height={600}
+              className="h-40 w-full object-cover rounded-md" />
+          ))}
+        </div>
+        <div className="mt-6">
+          <Link href="/gallery" className="underline">See full gallery →</Link>
+        </div>
+      </section>
+
+      {/* TESTIMONIALS */}
+      <section className="bg-gray-50">
+        <div className="mx-auto max-w-6xl px-6 py-12 grid gap-6 md:grid-cols-3">
+          {[
+            ["“100% recommend. The lakeside setting is unreal.”","— K & J"],
+            ["“Month-of coordination kept everything smooth.”","— A & T"],
+            ["“Night lighting made the photos magical.”","— S & D"]
+          ].map(([q, who]) => (
+            <div key={q} className="rounded-xl border bg-white p-6">
+              <p className="text-lg">{q}</p>
+              <p className="mt-3 text-gray-600">{who}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* CTA STRIP */}
+      <section className="mx-auto max-w-6xl px-6 py-12">
+        <div className="rounded-xl border p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div>
+            <h3 className="text-2xl font-semibold">Check your date & plan a tour</h3>
+            <p className="text-gray-600 mt-1">Serving Loganville, Monroe, Snellville & East Atlanta.</p>
+          </div>
+          <Link href="/contact" className="px-5 py-3 bg-black text-white rounded-md">Get in touch</Link>
+        </div>
+      </section>
+    </main>
   );
 }
