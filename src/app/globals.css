@@ -2,7 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
-/* optional minimal base styles */
-:root { --bg: #ffffff; --fg: #111111; }
-html, body { height: 100%; }
-body { background: var(--bg); color: var(--fg); }
+:root{
+  --ff-display:'Playfair Display';
+  --ff-sans:'Inter';
+  --bg:#ffffff;
+  --ink:#1F1F1F;
+}
+html,body{height:100%}
+body{background:var(--bg); color:var(--ink)}
+.container{ @apply mx-auto max-w-6xl px-6; }
+.btn{ @apply inline-flex items-center justify-center rounded-md px-5 py-3 text-sm font-medium; }
+.btn-primary{ @apply bg-brand-green text-white hover:opacity-90; }
+.btn-outline{ @apply border border-brand-green text-brand-green hover:bg-brand-green hover:text-white; }
+.card{ @apply rounded-xl border shadow-sm bg-white; }
+.section{ @apply py-12 md:py-16; }
