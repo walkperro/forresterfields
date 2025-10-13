@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://forresterfields.vercel.app/sitemap.xml
