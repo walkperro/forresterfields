@@ -1,14 +1,22 @@
-import Image from "next/image";
+import Lightbox from "@/components/Lightbox";
+
+export const metadata = {
+  title: "Gallery – Forrester Fields",
+  description: "A look at weddings and events at our lakeside venue.",
+};
+
+const IMGS = [
+  "/gallery/g1.webp","/gallery/g2.webp","/gallery/g3.webp","/gallery/g4.webp",
+  "/gallery/g5.webp","/gallery/g6.webp","/gallery/g7.webp","/gallery/g8.webp",
+];
+
 export default function Gallery() {
-  const imgs = ["g1.webp","g2.webp","g3.webp","g4.webp","g5.webp","g6.webp","g7.webp","g8.webp"];
   return (
     <main className="container py-12">
       <h1 className="font-display text-4xl">Gallery</h1>
-      <div className="mt-6 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-        {imgs.map((f,i)=>(
-          <Image key={i} src={`/gallery/${f}`} alt={`Gallery ${i+1}`} width={1200} height={900}
-            className="h-48 w-full object-cover rounded-md" />
-        ))}
+      <p className="text-gray-600 mt-2">Tap any photo to view full size.</p>
+      <div className="mt-6">
+        <Lightbox images={IMGS} />
       </div>
     </main>
   );

@@ -1,3 +1,6 @@
+
+import WorkerApplyForm from "@/components/WorkerApplyForm";
+import ApprovedWorkers from "@/components/ApprovedWorkers";
 export default function EventPool() {
   const roles = ["Set-up / Clean-up","Decorating","Greeting guests","Parking","Passing drinks & apps","Serving food","Bartending","Bathroom attendants","Driver (bride & groom departure)"];
   return (
@@ -24,6 +27,7 @@ export default function EventPool() {
           <h3 className="text-xl font-semibold">Apply to Join the Worker Pool</h3>
           <p className="text-gray-600 mt-1">Pay is typically $20/hr. Approved workers can view & claim shifts; swaps are allowed with notice.</p>
           <form action="https://formsubmit.co/workers@forresterfields.com" method="POST" className="mt-4 grid gap-3">
+        <input type="hidden" name="_next" value="https://forresterfields.vercel.app/thanks" />
             <input type="hidden" name="_subject" value="Worker Pool Application" />
             <input type="hidden" name="_captcha" value="false" />
             <input className="border p-3 rounded-md" name="name" placeholder="Full name" required />
@@ -41,6 +45,8 @@ export default function EventPool() {
             <textarea className="border p-3 rounded-md" name="references" rows={3} placeholder="References (names, phone/email)"></textarea>
             <button className="btn btn-primary">Submit Application</button>
           </form>
+  <WorkerApplyForm />
+  <ApprovedWorkers />
         </section>
 
         {/* Planner Request */}
@@ -48,6 +54,7 @@ export default function EventPool() {
           <h3 className="text-xl font-semibold">Request Workers (for Planners)</h3>
           <p className="text-gray-600 mt-1">We’ll confirm availability from our vetted pool and follow up fast.</p>
           <form action="https://formsubmit.co/planners@forresterfields.com" method="POST" className="mt-4 grid gap-3">
+        <input type="hidden" name="_next" value="https://forresterfields.vercel.app/thanks" />
             <input type="hidden" name="_subject" value="Planner Request for Workers" />
             <input type="hidden" name="_captcha" value="false" />
             <input className="border p-3 rounded-md" name="plannerName" placeholder="Planner / Business name" required />
@@ -59,6 +66,8 @@ export default function EventPool() {
             <textarea className="border p-3 rounded-md" name="notes" rows={3} placeholder="Notes"></textarea>
             <button className="btn btn-outline">Send Request</button>
           </form>
+  <WorkerApplyForm />
+  <ApprovedWorkers />
         </section>
       </div>
     </main>
