@@ -6,7 +6,7 @@ export default function EventPool() {
 
       <div className="max-w-3xl mt-6 space-y-4 text-gray-800">
         <p><strong>Are you a dependable worker looking to earn extra money on weekends you choose?</strong><br/> <strong>Or a special events planner scrambling for dependable workers?</strong></p>
-        <p>This is the place for you. Let’s help each other in the special events community of Walton County.</p>
+        <p>This is the place for you. Let’s help each other in the special events community of Walton County and the Greater Atlanta area.</p>
         <p>As a special events planner, my job is to handle the behind-the-scenes hustle and make sure the big day goes off without a hitch. A successful event hinges on the reliability and efficiency of a cohesive team. I look for hard-working, dependable, ethical workers with strong references, communication, and transportation.</p>
         <p>Even when you secure the best workers well in advance, life happens. To make sure that never leaves an event short-staffed, I created a vetted pool of event workers. If a change arises, a worker can log in and swap with another approved member so the event remains fully staffed. If a contracted worker fails to get a replacement, they’re removed from the pool and forfeit future jobs with Forrester Fields or partners.</p>
         <p>If you’re looking to work special events in Walton County, apply below. If you’re a planner who’d like access to dependable workers, send us your request.</p>
