@@ -6,8 +6,14 @@ export const metadata = {
 };
 
 const IMGS = [
-  "/gallery/g1.webp","/gallery/g2.webp","/gallery/g3.webp","/gallery/g4.webp",
-  "/gallery/g5.webp","/gallery/g6.webp","/gallery/g7.webp","/gallery/g8.webp",
+  "https://picsum.photos/seed/ff1/2000/1300",
+  "https://picsum.photos/seed/ff2/2000/1300",
+  "https://picsum.photos/seed/ff3/2000/1300",
+  "https://picsum.photos/seed/ff4/2000/1300",
+  "https://picsum.photos/seed/ff5/2000/1300",
+  "https://picsum.photos/seed/ff6/2000/1300",
+  "https://picsum.photos/seed/ff7/2000/1300",
+  "https://picsum.photos/seed/ff8/2000/1300",
 ];
 
 export default function Gallery() {
