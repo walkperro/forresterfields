@@ -1,75 +1,153 @@
-import { supabase } from '@/lib/supabase';
+/* Event Pool page – restored layout with both forms and "Typical Roles"
+   This file only handles the static page content + forms. Your jobs
+   fetching/listing code can live elsewhere on the page or another component. */
+import React from "react";
 
-export const revalidate = 60;
-
-type Job = {
-  id: string;
-  title: string | null;
-  event_date: string | null;   // date
-  location: string | null;
-  roles: string[] | null;      // stored as text[] in DB; Supabase returns string[] here
-  pay: string | null;
-  start_time: string | null;
-  end_time: string | null;
-  notes: string | null;
-  status: string | null;
-};
-
-export default async function EventPoolPage() {
-  const { data: jobs, error } = await supabase
-    .from('jobs')
-    .select('*')
-    .order('event_date', { ascending: true });
-
+export default function EventPoolPage() {
   return (
-    <main className="max-w-5xl mx-auto px-4 py-12">
-      <h1 className="text-5xl font-serif font-semibold tracking-tight">The Event Pool by Forrester Fields</h1>
-
-      <div className="mt-6 space-y-4 text-lg leading-8 text-slate-700">
-        <p className="font-semibold text-slate-900">
+    <div className="mx-auto max-w-3xl lg:max-w-5xl px-4 py-12 space-y-12">
+      <header className="space-y-6">
+        <h1 className="text-4xl md:text-5xl font-serif tracking-tight">
+          The Event Pool by Forrester Fields
+        </h1>
+        <p className="text-xl font-semibold">
           Are you a dependable worker looking to earn extra money on weekends you choose?
-          <br />Or a special events planner scrambling for dependable workers?
+          Or a special events planner scrambling for dependable workers?
         </p>
-        <p>This is the place for you. Let’s help each other in the special-events community of Walton County and the greater Atlanta area.</p>
-        <p>As a special events planner, my job is to handle the behind-the-scenes hustle and make sure the big day goes off without a hitch. That requires a reliable, efficient team with great references, communication, and transportation.</p>
-        <p>If a change arises, workers can log in and swap with another approved member so staffing stays full. If a contracted worker can’t get a replacement, they’re removed from the pool and forfeit future jobs with Forrester Fields or its partners.</p>
-      </div>
-
-      <h2 className="mt-12 text-2xl font-semibold">Current Open Roles</h2>
-
-      {error && (
-        <div className="mt-4 rounded-md border border-red-200 bg-red-50 p-3 text-red-700">
-          Failed to load jobs: {error.message}
+        <div className="space-y-4 text-lg leading-8 text-gray-700">
+          <p>
+            This is the place for you. Let’s help each other in the special events
+            community of Walton County and the Greater Atlanta area.
+          </p>
+          <p>
+            As a special events planner, my job is to handle the behind-the-scenes hustle
+            and make sure the big day goes off without a hitch. A successful event hinges
+            on the reliability and efficiency of a cohesive team. I look for hard-working,
+            dependable, ethical workers with strong references, communication, and transportation.
+          </p>
+          <p>
+            Even when you secure the best workers well in advance, life happens. To make sure
+            that never leaves an event short-staffed, I created a vetted pool of event workers.
+            If a change arises, a worker can log in and swap with another approved member so the
+            event remains fully staffed. If a contracted worker fails to get a replacement,
+            they’re removed from the pool and forfeit future jobs with Forrester Fields or partners.
+          </p>
+          <p>
+            If you’re looking to work special events in Walton County, apply below. If you’re
+            a planner who’d like access to dependable workers, send us your request.
+          </p>
+          <p className="italic">— Marisol Forrester</p>
         </div>
-      )}
+      </header>
 
-      <div className="mt-6 grid gap-6 sm:grid-cols-2">
-        {(jobs as Job[] | null)?.length ? (
-          (jobs as Job[]).map((job) => (
-            <article key={job.id} className="rounded-xl border border-slate-200 p-5 shadow-sm bg-white">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-slate-900">{job.title ?? 'Event role'}</h3>
-                <span className="text-sm px-2 py-1 rounded-full border border-slate-200">{job.status ?? 'Open'}</span>
+      {/* Typical Roles */}
+      <section className="space-y-4">
+        <h2 className="text-3xl font-serif">Typical Roles</h2>
+        <ul className="list-disc pl-6 space-y-2 text-gray-700">
+          <li>Set-up / Clean-up</li>
+          <li>Decorating</li>
+          <li>Greeting guests</li>
+          <li>Parking</li>
+          <li>Passing drinks &amp; apps</li>
+          <li>Serving food</li>
+          <li>Bartending</li>
+          <li>Bathroom attendants</li>
+          <li>Driver (bride &amp; groom departure)</li>
+        </ul>
+      </section>
+
+      {/* Two cards side-by-side on desktop */}
+      <section className="grid gap-8 lg:grid-cols-2">
+        {/* Apply to Join the Worker Pool */}
+        <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h3 className="text-2xl font-semibold">Apply to Join the Worker Pool</h3>
+          <p className="mt-1 mb-6 text-gray-600">
+            Pay is typically $20/hr. Approved workers can view &amp; claim shifts; swaps are allowed with notice.
+          </p>
+
+          <form className="space-y-4" method="post" action="/api/apply">
+            <input name="name" placeholder="Full name" className="w-full rounded-md border p-3" required />
+            <input name="email" placeholder="Email" type="email" className="w-full rounded-md border p-3" required />
+            <input name="phone" placeholder="Phone" className="w-full rounded-md border p-3" />
+
+            <textarea
+              name="availability"
+              placeholder="Availability (Fri/Sat/Sun, evenings, etc.)"
+              className="w-full rounded-md border p-3 h-24"
+            />
+
+            <fieldset className="space-y-3">
+              <legend className="font-medium">Roles you can do</legend>
+              <div className="space-y-2 text-gray-800">
+                {[
+                  "Set-up / Clean-up",
+                  "Decorating",
+                  "Greeting guests",
+                  "Parking",
+                  "Passing drinks & apps",
+                  "Serving food",
+                  "Bartending",
+                  "Bathroom attendant",
+                  "Driver",
+                ].map((r) => (
+                  <label key={r} className="flex items-center gap-3">
+                    <input type="checkbox" name="roles" value={r} className="h-4 w-4" />
+                    <span>{r}</span>
+                  </label>
+                ))}
               </div>
-              <dl className="mt-3 space-y-1 text-sm text-slate-700">
-                <div className="flex gap-2"><dt className="w-28 font-medium">Date</dt><dd>{job.event_date ?? 'TBD'}</dd></div>
-                <div className="flex gap-2"><dt className="w-28 font-medium">Location</dt><dd>{job.location ?? 'TBD'}</dd></div>
-                <div className="flex gap-2"><dt className="w-28 font-medium">Roles</dt>
-                  <dd>{Array.isArray(job.roles) ? job.roles.join(', ') : (job.roles as any)?.toString?.() ?? '—'}</dd>
-                </div>
-                <div className="flex gap-2"><dt className="w-28 font-medium">Pay</dt><dd>{job.pay ?? '—'}</dd></div>
-                <div className="flex gap-2"><dt className="w-28 font-medium">Time</dt><dd>{[job.start_time, job.end_time].filter(Boolean).join(' – ') || '—'}</dd></div>
-              </dl>
-              {job.notes && <p className="mt-3 text-sm text-slate-600">{job.notes}</p>}
-              <button className="mt-4 inline-flex items-center rounded-lg border px-3 py-2 text-sm hover:bg-slate-50">
-                Request to work
-              </button>
-            </article>
-          ))
-        ) : (
-          <p className="text-slate-600">No open roles yet. Check back soon!</p>
-        )}
-      </div>
-    </main>
+            </fieldset>
+
+            <textarea
+              name="references"
+              placeholder="References (names, phone/email)"
+              className="w-full rounded-md border p-3 h-24"
+            />
+
+            <button
+              type="submit"
+              className="w-full rounded-md bg-green-800 px-4 py-3 text-white font-medium hover:bg-green-700"
+            >
+              Submit Application
+            </button>
+
+            {/* Small helper text & placeholder list (as in screenshot) */}
+            <div className="pt-4 text-sm text-gray-600">
+              <div className="font-medium">Availability, transport, refs, etc.</div>
+              <div className="mt-2">No approved workers yet.</div>
+            </div>
+          </form>
+        </div>
+
+        {/* Request Workers (for Planners) */}
+        <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h3 className="text-2xl font-semibold">Request Workers (for Planners)</h3>
+          <p className="mt-1 mb-6 text-gray-600">
+            We’ll confirm availability from our vetted pool and follow up fast.
+          </p>
+
+          <form className="space-y-4" method="post" action="/api/planner-request">
+            <input name="planner" placeholder="Planner / Business name" className="w-full rounded-md border p-3" required />
+            <input name="email" placeholder="Email" type="email" className="w-full rounded-md border p-3" required />
+            <input name="phone" placeholder="Phone" className="w-full rounded-md border p-3" />
+            <input name="event_date" placeholder="Event date" className="w-full rounded-md border p-3" />
+            <input name="venue" placeholder="City / Venue" className="w-full rounded-md border p-3" />
+            <textarea
+              name="roles_needed"
+              placeholder="Roles needed + hours"
+              className="w-full rounded-md border p-3 h-24"
+            />
+            <textarea name="notes" placeholder="Notes" className="w-full rounded-md border p-3 h-24" />
+
+            <button
+              type="submit"
+              className="w-full rounded-md border border-green-800 text-green-900 px-4 py-3 font-medium hover:bg-green-50"
+            >
+              Send Request
+            </button>
+          </form>
+        </div>
+      </section>
+    </div>
   );
 }
