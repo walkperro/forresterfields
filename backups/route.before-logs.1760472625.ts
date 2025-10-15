@@ -20,57 +20,71 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const form = await req.formData();
+
     const planner      = (form.get("planner") ?? "").toString();
     const email        = (form.get("email") ?? "").toString();
     const phone        = (form.get("phone") ?? "").toString();
     const event_date   = (form.get("event_date") ?? "").toString();
-    const city_venue   = (form.get("city_venue") ?? "").toString();
+    const venue        = (form.get("venue") ?? "").toString(); // <-- matches your form
     const roles_needed = (form.get("roles_needed") ?? "").toString();
     const notes        = (form.get("notes") ?? "").toString();
 
-    // 1) Store in DB (best-effort)
+    // 1) Best-effort DB insert
     try {
       const supabaseAdmin = getSupabaseAdmin();
       await supabaseAdmin.from("planner_requests").insert({
-        planner, email, phone, event_date, city_venue, roles_needed, notes,
+        planner, email, phone, event_date, venue, roles_needed, notes,
       });
     } catch (e) {
       console.error("Supabase insert failed (continuing):", e);
     }
 
-    // 2) Email Marisol
-    const from = process.env.NOTIFY_FROM_EMAIL || "Forrester Fields <noreply@forresterfields.com>";
+    // 2) Email
+    const from = process.env.NOTIFY_FROM_EMAIL || "Forrester Fields <onboarding@resend.dev>";
     const to   = process.env.NOTIFY_TO_EMAIL   || "forresterfieldsweddings@gmail.com";
 
-    await resend.emails.send({
-      from,
-      to,
-      subject: `Planner request: ${planner || "Unknown"} – ${event_date || "TBD"}`,
-      text:
+    console.log("EMAIL_ENV", { from, to });
+    console.log("FORM_ENTRIES", { planner, email, phone, event_date, venue, roles_needed, notes });
+
+    try {
+      await resend.emails.send({
+        from,
+        to,
+        subject: `Planner request: ${planner || "Unknown"} – ${event_date || "TBD"}`,
+        text:
 `Planner: ${planner}
 Email: ${email}
 Phone: ${phone}
 Event date: ${event_date}
-City/Venue: ${city_venue}
+Venue: ${venue}
 Roles needed: ${roles_needed}
 Notes:
 ${notes}
 `,
-      html:
+        html:
 `<h2>Planner request</h2>
 <p><b>Planner:</b> ${planner}<br/>
 <b>Email:</b> ${email}<br/>
 <b>Phone:</b> ${phone}</p>
 <p><b>Event date:</b> ${event_date}<br/>
-<b>City/Venue:</b> ${city_venue}</p>
+<b>Venue:</b> ${venue}</p>
 <p><b>Roles needed:</b> ${roles_needed}</p>
 <p><b>Notes:</b><br/>${(notes || "").replace(/\n/g,"<br/>")}</p>`
-    });
+      });
+      console.log("RESEND_OK");
+    } catch (e: unknown) {
+      const dump = (e && typeof e === "object")
+        ? JSON.stringify(e, Object.getOwnPropertyNames(e as object))
+        : String(e);
+      console.error("RESEND_ERROR", dump);
+      // Re-throw so the client gets a 500
+      throw e;
+    }
 
     return NextResponse.json({ ok: true });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error(err);
-    return NextResponse.json({ ok:false, error: msg }, { status: 500 });
+    console.error("API_ERROR", msg);
+    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
   }
 }
