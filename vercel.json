@@ -1,0 +1,5 @@
+{
+  "crons": [
+    { "path": "/api/requests/auto-age", "schedule": "0 0 * * *" }
+  ]
+}
