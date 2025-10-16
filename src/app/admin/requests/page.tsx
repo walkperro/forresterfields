@@ -1,6 +1,11 @@
+import "../admin.css";
+import "../admin-ui.css";
+import AdminNav from "@/components/AdminNav";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import ClientTable from "./ClientTable";
 import type { PlannerRequest } from "./types";
+
+export const dynamic = "force-dynamic";
 
 async function getData(): Promise<PlannerRequest[]> {
   const supabase = getSupabaseAdmin();
@@ -18,18 +23,10 @@ export default async function Page() {
   return (
     <div className="max-w-5xl mx-auto px-4 py-10">
       <h1 className="font-display text-3xl mb-6">Planner Requests</h1>
-
-      <div className="mb-4">
-        <a
-          href="/api/requests/export"
-          className="inline-flex items-center rounded-md border px-3 py-2 text-sm hover:bg-gray-50"
-        >
-          Export CSV
-        </a>
+      <AdminNav />
+      <div className="mt-6">
+        <ClientTable initialRows={rows} />
       </div>
-
-      {/* Client table */}
-      <ClientTable initialRows={rows} />
     </div>
   );
 }
