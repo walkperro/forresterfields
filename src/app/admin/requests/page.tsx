@@ -17,7 +17,7 @@ export default async function Page() {
   const rows = await getData();
   return (
     <div className="max-w-5xl mx-auto px-4 py-10">
-      <h1 className="text-3xl font-semibold mb-6">Planner Requests</h1>
+      <h1 className="font-display text-3xl mb-6">Planner Requests</h1>
 
       <div className="mb-4">
         <a
