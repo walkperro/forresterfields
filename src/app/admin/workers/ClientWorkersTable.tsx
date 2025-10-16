@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 export type WorkerRow = {
   id: string;
@@ -13,7 +13,7 @@ export type WorkerRow = {
   references_text: string;
   experience: string;
   city: string;
-  age: string; // keep as string for easy display
+  age: string;
   status: "new" | "contacted" | "booked" | "archived";
 };
 
@@ -44,12 +44,64 @@ function statusBadge(status: WorkerRow["status"]) {
   }
 }
 
+const STATUS_VALUES: WorkerRow["status"][] = ["new", "contacted", "booked", "archived"];
+
 export default function ClientWorkersTable({ data }: { data: WorkerRow[] }) {
-  const rows = useMemo(() => data, [data]);
+  const [rows, setRows] = useState<WorkerRow[]>(useMemo(() => data, [data]));
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  async function postUpdate(payload: {
+    id: string;
+    status?: WorkerRow["status"];
+    decision?: "accept" | "deny";
+    note?: string;
+  }) {
+    const res = await fetch("/api/workers/update", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      throw new Error(j?.error || `Update failed (${res.status})`);
+    }
+  }
+
+  async function changeStatus(id: string, newStatus: WorkerRow["status"]) {
+    setBusyId(id);
+    const prev = rows;
+    try {
+      setRows((rs) => rs.map((r) => (r.id === id ? { ...r, status: newStatus } : r)));
+      await postUpdate({ id, status: newStatus });
+    } catch (e) {
+      // revert on error
+      setRows(prev);
+      alert((e as Error).message);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function decide(id: string, decision: "accept" | "deny") {
+    const note = window.prompt(`Optional note to include in the ${decision} email:`) || "";
+    setBusyId(id);
+    const prev = rows;
+    try {
+      // If accept, also mark booked; if deny, mark archived
+      const mappedStatus: WorkerRow["status"] = decision === "accept" ? "booked" : "archived";
+      setRows((rs) => rs.map((r) => (r.id === id ? { ...r, status: mappedStatus } : r)));
+      await postUpdate({ id, decision, status: mappedStatus, note });
+    } catch (e) {
+      setRows(prev);
+      alert((e as Error).message);
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   return (
     <div className="rounded-xl border bg-white overflow-x-auto">
-      <table className="w-full text-sm min-w-[1000px]">
+      <table className="w-full text-sm min-w-[1100px]">
         <thead className="bg-gray-50 text-gray-700">
           <tr>
             <th className="text-left px-4 py-3">Name</th>
@@ -63,6 +115,7 @@ export default function ClientWorkersTable({ data }: { data: WorkerRow[] }) {
             <th className="text-left px-4 py-3">Experience</th>
             <th className="text-left px-4 py-3">Status</th>
             <th className="text-left px-4 py-3">Applied</th>
+            <th className="text-left px-4 py-3">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -77,7 +130,23 @@ export default function ClientWorkersTable({ data }: { data: WorkerRow[] }) {
               <td className="px-4 py-3">{r.roles || "—"}</td>
               <td className="px-4 py-3 whitespace-pre-wrap">{r.references_text || "—"}</td>
               <td className="px-4 py-3 whitespace-pre-wrap">{r.experience || "—"}</td>
-              <td className="px-4 py-3">{statusBadge(r.status)}</td>
+              <td className="px-4 py-3">
+                <div className="flex items-center gap-2">
+                  {statusBadge(r.status)}
+                  <select
+                    disabled={busyId === r.id}
+                    className="border rounded-md px-2 py-1 text-xs bg-white"
+                    value={r.status}
+                    onChange={(e) => changeStatus(r.id, e.target.value as WorkerRow["status"])}
+                  >
+                    {STATUS_VALUES.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </td>
               <td className="px-4 py-3">
                 {new Date(r.created_at).toLocaleString(undefined, {
                   year: "numeric",
@@ -86,6 +155,24 @@ export default function ClientWorkersTable({ data }: { data: WorkerRow[] }) {
                   hour: "2-digit",
                   minute: "2-digit",
                 })}
+              </td>
+              <td className="px-4 py-3">
+                <div className="flex gap-2">
+                  <button
+                    disabled={busyId === r.id}
+                    className="px-3 py-1 rounded-md border border-green-700 text-green-800 text-xs hover:bg-green-50"
+                    onClick={() => decide(r.id, "accept")}
+                  >
+                    Accept
+                  </button>
+                  <button
+                    disabled={busyId === r.id}
+                    className="px-3 py-1 rounded-md border border-red-700 text-red-800 text-xs hover:bg-red-50"
+                    onClick={() => decide(r.id, "deny")}
+                  >
+                    Deny
+                  </button>
+                </div>
               </td>
             </tr>
           ))}
