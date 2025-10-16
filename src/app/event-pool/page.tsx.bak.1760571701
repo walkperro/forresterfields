@@ -1,43 +1,68 @@
-export default function EventPoolPage() {
-  const ROLES = [
-    "Set-up", "Clean-up", "Decorating", "Greeting guests",
-    "Parking", "Passing drinks & apps", "Serving food",
-    "Bartending", "Bathroom attendants",
-    "Driver for bride & groom’s departure"
-  ];
+/* Event Pool page – restored layout with both forms and "Typical Roles"
+   This file only handles the static page content + forms. Your jobs
+   fetching/listing code can live elsewhere on the page or another component. */
+import React from "react";
 
+export default function EventPoolPage() {
   return (
     <div className="mx-auto max-w-3xl lg:max-w-5xl px-4 py-12 space-y-12">
       <header className="space-y-6">
         <h1 className="text-4xl md:text-5xl font-serif tracking-tight">
-          Forrester Fields Worker Pool
+          The Event Pool by Forrester Fields
         </h1>
         <p className="text-xl font-semibold">
-          Serving Walton County &amp; Greater Atlanta special event planners and dependable weekend workers.
+          Are you a dependable worker looking to earn extra money on weekends you choose?
+          Or a special events planner scrambling for dependable workers?
         </p>
         <div className="space-y-4 text-lg leading-8 text-gray-700">
           <p>
-            A successful event hinges on a reliable, ethical, and hard-working team. We pre-screen workers for
-            communication, transportation, and references. If a contracted worker can’t make it, they can swap
-            with another approved member to keep your event fully staffed.
+            This is the place for you. Let’s help each other in the special events
+            community of Walton County and the Greater Atlanta area.
+          </p>
+          <p>
+            As a special events planner, my job is to handle the behind-the-scenes hustle
+            and make sure the big day goes off without a hitch. A successful event hinges
+            on the reliability and efficiency of a cohesive team. I look for hard-working,
+            dependable, ethical workers with strong references, communication, and transportation.
+          </p>
+          <p>
+            Even when you secure the best workers well in advance, life happens. To make sure
+            that never leaves an event short-staffed, I created a vetted pool of event workers.
+            If a change arises, a worker can log in and swap with another approved member so the
+            event remains fully staffed. If a contracted worker fails to get a replacement,
+            they’re removed from the pool and forfeit future jobs with Forrester Fields or partners.
+          </p>
+          <p>
+            If you’re looking to work special events in Walton County, apply below. If you’re
+            a planner who’d like access to dependable workers, send us your request.
           </p>
           <p className="italic">— Marisol Forrester</p>
         </div>
       </header>
 
+      {/* Typical Roles */}
       <section className="space-y-4">
         <h2 className="text-3xl font-serif">Typical Roles</h2>
         <ul className="list-disc pl-6 space-y-2 text-gray-700">
-          {ROLES.map((r) => (<li key={r}>{r}</li>))}
+          <li>Set-up / Clean-up</li>
+          <li>Decorating</li>
+          <li>Greeting guests</li>
+          <li>Parking</li>
+          <li>Passing drinks &amp; apps</li>
+          <li>Serving food</li>
+          <li>Bartending</li>
+          <li>Bathroom attendants</li>
+          <li>Driver (bride &amp; groom departure)</li>
         </ul>
       </section>
 
+      {/* Two cards side-by-side on desktop */}
       <section className="grid gap-8 lg:grid-cols-2">
-        {/* ===== Worker Application ===== */}
+        {/* Apply to Join the Worker Pool */}
         <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
           <h3 className="text-2xl font-semibold">Apply to Join the Worker Pool</h3>
           <p className="mt-1 mb-6 text-gray-600">
-            Weekend, on-call, and event-by-event work. We’ll contact you if approved.
+            Pay is typically $20/hr. Approved workers can view &amp; claim shifts; swaps are allowed with notice.
           </p>
 
           <form className="space-y-4" method="post" action="/api/apply">
@@ -47,14 +72,24 @@ export default function EventPoolPage() {
 
             <textarea
               name="availability"
-              placeholder="Availability (weekends, evenings, specific dates)"
+              placeholder="Availability (Fri/Sat/Sun, evenings, etc.)"
               className="w-full rounded-md border p-3 h-24"
             />
 
             <fieldset className="space-y-3">
               <legend className="font-medium">Roles you can do</legend>
               <div className="space-y-2 text-gray-800">
-                {ROLES.map((r) => (
+                {[
+                  "Set-up / Clean-up",
+                  "Decorating",
+                  "Greeting guests",
+                  "Parking",
+                  "Passing drinks & apps",
+                  "Serving food",
+                  "Bartending",
+                  "Bathroom attendant",
+                  "Driver",
+                ].map((r) => (
                   <label key={r} className="flex items-center gap-3">
                     <input type="checkbox" name="roles" value={r} className="h-4 w-4" />
                     <span>{r}</span>
@@ -75,32 +110,34 @@ export default function EventPoolPage() {
             >
               Submit Application
             </button>
+
+            {/* Small helper text & placeholder list (as in screenshot) */}
+            <div className="pt-4 text-sm text-gray-600">
+              <div className="font-medium">Availability, transport, refs, etc.</div>
+              <div className="mt-2">No approved workers yet.</div>
+            </div>
           </form>
         </div>
 
-        {/* ===== Planner Request ===== */}
+        {/* Request Workers (for Planners) */}
         <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
           <h3 className="text-2xl font-semibold">Request Workers (for Planners)</h3>
           <p className="mt-1 mb-6 text-gray-600">
-            Tell us what you need. We’ll confirm coverage from our approved pool.
+            We’ll confirm availability from our vetted pool and follow up fast.
           </p>
 
           <form className="space-y-4" method="post" action="/api/planner-request">
-            {/* honeypot anti-spam field (hidden) */}
-            <input type="text" name="_gotcha" className="hidden" tabIndex={-1} autoComplete="off" />
-
+          <form className="space-y-4" method="post" action="/api/planner-request">
             <input name="planner" placeholder="Planner / Business name" className="w-full rounded-md border p-3" required />
             <input name="email" placeholder="Email" type="email" className="w-full rounded-md border p-3" required />
             <input name="phone" placeholder="Phone" className="w-full rounded-md border p-3" />
             <input name="event_date" placeholder="Event date" className="w-full rounded-md border p-3" />
             <input name="venue" placeholder="City / Venue" className="w-full rounded-md border p-3" />
-
             <textarea
               name="roles_needed"
-              placeholder="Needed roles & quantity (e.g., 2 setup, 3 servers, 1 bartender)"
+              placeholder="Roles needed + hours"
               className="w-full rounded-md border p-3 h-24"
             />
-
             <textarea name="notes" placeholder="Notes" className="w-full rounded-md border p-3 h-24" />
 
             <button
