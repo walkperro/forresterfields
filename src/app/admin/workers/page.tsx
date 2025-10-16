@@ -1,6 +1,6 @@
 import "../admin.css";
 import "../admin-ui.css";
-import AdminNav from "../../../components/AdminNav";
+import AdminNav from "@/components/AdminNav";
 import ClientWorkersTable, { WorkerRow } from "./ClientWorkersTable";
 import { createClient } from "@supabase/supabase-js";
 
@@ -12,7 +12,11 @@ type WorkerDB = {
   email?: string | null;
   phone?: string | null;
   availability?: string | null;
-  roles?: string[] | string | null;
+  roles?: string[] | null;
+  references_text?: string | null; // reserved-word safe
+  experience?: string | null;
+  city?: string | null;
+  age?: number | null;
   status?: string | null;
 };
 
@@ -24,41 +28,43 @@ function getAdmin() {
 
 export const dynamic = "force-dynamic";
 
-function normalizeStatus(raw: string | null | undefined): WorkerRow["status"] {
-  const s = (raw ?? "pending").toLowerCase().trim();
-  if (s === "pending" || s === "new") return "new";
-  if (s === "contacted" || s === "reached") return "contacted";
-  if (s === "booked" || s === "hired") return "booked";
-  if (s === "archived" || s === "rejected") return "archived";
-  return "new";
-}
-
 async function getWorkers(): Promise<WorkerRow[]> {
   const supabase = getAdmin();
+
   const { data } = await supabase
     .from("workers")
-    .select("id, created_at, name, full_name, email, phone, availability, roles, status")
+    .select("id, created_at, name, full_name, email, phone, availability, roles, references_text, experience, city, age, status")
     .order("created_at", { ascending: false });
 
   const rows: WorkerDB[] = (data ?? []) as WorkerDB[];
-
   return rows.map((r) => {
-    const displayName = r.name ?? r.full_name ?? "";
-    let rolesStr = "";
-    if (Array.isArray(r.roles)) rolesStr = r.roles.join(", ");
-    else if (typeof r.roles === "string") rolesStr = r.roles;
+    const displayName =
+      (r.full_name ?? r.name ?? "").trim() ||
+      [r.full_name, r.name].filter(Boolean).join(" ").trim();
+
+    const rolesJoined =
+      Array.isArray(r.roles) ? r.roles.join(", ") : (r.roles as unknown as string) ?? "";
+
+    const normalizedStatus: WorkerRow["status"] = (["new", "contacted", "booked", "archived"] as const).includes(
+      (r.status ?? "new") as WorkerRow["status"]
+    )
+      ? (r.status as WorkerRow["status"])
+      : "new";
 
     return {
       id: r.id,
       created_at: r.created_at,
-      name: displayName,
+      name: displayName || "—",
       email: r.email ?? "",
       phone: r.phone ?? "",
       availability: r.availability ?? "",
-      roles: rolesStr,
-      references_text: "", // not used right now
-      status: normalizeStatus(r.status),
-    } as WorkerRow;
+      roles: rolesJoined,
+      references_text: r.references_text ?? "",
+      experience: r.experience ?? "",
+      city: r.city ?? "",
+      age: typeof r.age === "number" ? String(r.age) : (r.age ?? "") as string,
+      status: normalizedStatus,
+    };
   });
 }
 
