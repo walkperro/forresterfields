@@ -1,7 +1,7 @@
+import ApplyForm from "./ApplyForm";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from '@/lib/supabase';
 
-/* eslint-disable @typescript-eslint/no-unused-vars */
 
 export const dynamic = 'force-dynamic'; // fetch on each request (fixes empty on Vercel)
 export const revalidate = 0;
@@ -65,25 +65,9 @@ export default async function EventPoolPage() {
       </div>
 
       <h2 id="apply" className="mt-14 text-2xl font-semibold">Apply to Join the Pool</h2>
-      <form className="mt-6 grid gap-4 sm:grid-cols-2">
-        <input required name="name" placeholder="Full name" className="rounded-lg border p-3" />
-        <input required type="email" name="email" placeholder="Email" className="rounded-lg border p-3" />
-        <input name="phone" placeholder="Phone" className="rounded-lg border p-3 sm:col-span-2" />
-        <div className="sm:col-span-2">
-          <label className="block text-sm font-medium mb-2">Roles you can do</label>
-          <div className="grid grid-cols-2 gap-2 text-sm">
-            {['Setup', 'Cleanup', 'Decorating', 'Greeting guests', 'Parking', 'Passing drinks & apps', 'Serving food', 'Bartending', 'Bathroom attendant', 'Driver'].map(r => (
-              <label key={r} className="inline-flex items-center gap-2">
-                <input type="checkbox" name="roles" value={r} className="h-4 w-4" /> {r}
-              </label>
-            ))}
-          </div>
-        </div>
-        <textarea name="notes" placeholder="Anything we should know?" className="rounded-lg border p-3 sm:col-span-2" rows={4} />
-        <button type="button" className="rounded-lg bg-emerald-700 text-white px-4 py-2 text-sm sm:col-span-2">
-          Submit (coming soon)
-        </button>
-      </form>
+      <div className="mt-6">
+        <ApplyForm />
+      </div>
     </main>
   );
 }
