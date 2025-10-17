@@ -86,7 +86,7 @@ export default function ClientWorkersTable({ data }: { data: WorkerRow[] }) {
       await postUpdate({ id, status: newStatus });
     } catch (e) {
       setRows(prev);
-      alert((e as Error).message);
+      console.error("Silenced alert:", (e as Error).message);
     } finally {
       setBusyId(null);
     }
@@ -102,7 +102,7 @@ export default function ClientWorkersTable({ data }: { data: WorkerRow[] }) {
       await postUpdate({ id, decision, status: mapped, note });
     } catch (e) {
       setRows(prev);
-      alert((e as Error).message);
+      console.error("Silenced alert:", (e as Error).message);
     } finally {
       setBusyId(null);
     }
