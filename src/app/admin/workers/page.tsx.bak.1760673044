@@ -74,30 +74,3 @@ export default async function WorkersPage() {
   return (
     <div className="max-w-5xl mx-auto px-4 py-10">
       <h1 className="font-display text-3xl mb-6">Workers</h1>
-
-      <div className="mb-4 flex items-center gap-3">
-        <CsvButton
-          rows={rows as unknown as Record<string, unknown>[]}
-          columns={[
-            { key: "created_at",   label: "Created" },
-            { key: "name",         label: "Name" },
-            { key: "email",        label: "Email" },
-            { key: "phone",        label: "Phone" },
-            { key: "city",         label: "City" },
-            { key: "age",          label: "Age" },
-            { key: "availability", label: "Availability" },
-            { key: "roles",        label: "Roles" },
-            { key: "status",       label: "Status" }
-          ]}
-          filename={`workers-${new Date().toISOString().slice(0,10)}.csv`}
-          label="Download CSV"
-        />
-      </div>
-
-      <AdminNav />
-      <div className="mt-6">
-        <ClientWorkersTable data={rows} />
-      </div>
-    </div>
-  );
-}

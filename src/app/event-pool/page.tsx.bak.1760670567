@@ -2,9 +2,12 @@
 import { supabase } from '@/lib/supabase';
 
 /* eslint-disable @typescript-eslint/no-unused-vars */
+type Job = {
+/* eslint-enable @typescript-eslint/no-unused-vars */
 
-export const dynamic = 'force-dynamic'; // fetch on each request (fixes empty on Vercel)
-export const revalidate = 0;
+
+; export const dynamic = 'force-dynamic'; // fetch on each request (fixes empty on Vercel)
+; export const revalidate = 0;
 
 
 export default async function EventPoolPage() {

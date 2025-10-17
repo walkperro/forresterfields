@@ -24,29 +24,3 @@ export default async function Page() {
   return (
     <div className="max-w-5xl mx-auto px-4 py-10">
       <h1 className="font-display text-3xl mb-6">Planner Requests</h1>
-
-      <div className="mb-4 flex items-center gap-3">
-        <CsvButton
-          rows={rows as unknown as Record<string, unknown>[]}
-          columns={[
-            { key: "created_at",  label: "Created" },
-            { key: "planner_name", label: "Planner" },
-            { key: "email",        label: "Email" },
-            { key: "phone",        label: "Phone" },
-            { key: "event_date",   label: "Event Date" },
-            { key: "city_venue",   label: "City/Venue" },
-            { key: "roles_needed", label: "Roles Needed" },
-            { key: "status",       label: "Status" }
-          ]}
-          filename={`planner-requests-${new Date().toISOString().slice(0,10)}.csv`}
-          label="Download CSV"
-        />
-      </div>
-
-      <AdminNav />
-      <div className="mt-6">
-        <ClientTable initialRows={rows} />
-      </div>
-    </div>
-  );
-}

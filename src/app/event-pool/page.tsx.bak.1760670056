@@ -1,11 +1,20 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from '@/lib/supabase';
 
-/* eslint-disable @typescript-eslint/no-unused-vars */
-
 export const dynamic = 'force-dynamic'; // fetch on each request (fixes empty on Vercel)
 export const revalidate = 0;
 
+  id: string;
+  title: string | null;
+  event_date: string | null;
+  location: string | null;
+  roles: string[] | null;
+  pay: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  notes: string | null;
+  status: string | null;
+};
 
 export default async function EventPoolPage() {
   const { data: jobs, error } = await supabase
