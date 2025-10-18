@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { sendWorkerApplicationEmail } from "@/lib/email";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 
@@ -77,6 +79,11 @@ export async function POST(req: NextRequest) {
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+    try {
+      const to = process.env.NOTIFY_TO_EMAIL || "forresterfieldsweddings@gmail.com";
+      // "payload" should be your object with name/email/etc.
+      await sendWorkerApplicationEmail(to, payload as any);
+    } catch (err) { console.warn("[email] notify failed", err); }
     return NextResponse.json({ ok: true });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown error";
