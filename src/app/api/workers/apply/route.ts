@@ -1,39 +1,85 @@
-import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { NextRequest, NextResponse } from "next/server";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const key = process.env.SUPABASE_SERVICE_ROLE!;
+function normalize(v: unknown): string {
+  return String(v ?? "").trim();
+}
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+    const key = process.env.SUPABASE_SERVICE_ROLE || "";
+    if (!url || !key) {
+      return NextResponse.json(
+        { error: "Supabase environment variables are missing." },
+        { status: 500 }
+      );
+    }
 
-    // Basic sanitizing/shape
-    const row = {
-      full_name: (body.full_name ?? "").toString().slice(0, 200),
-      email: (body.email ?? "").toString().slice(0, 200),
-      phone: (body.phone ?? "").toString().slice(0, 100),
-      city: (body.city ?? "").toString().slice(0, 120),
-      age: (body.age ?? "").toString().slice(0, 20),
-      availability: (body.availability ?? "").toString().slice(0, 1000),
-      references_text: (body.references_text ?? "").toString().slice(0, 2000),
-      experience: (body.experience ?? "").toString().slice(0, 4000),
-      roles: Array.isArray(body.roles) ? body.roles.map(String).slice(0, 20) : [],
-      status: "new" as const,
+    const supabase = createSupabaseClient(url, key, { auth: { persistSession: false } });
+
+    const ct = (req.headers.get("content-type") || "").toLowerCase();
+    let raw: Record<string, unknown> = {};
+
+    if (ct.includes("application/json")) {
+      raw = (await req.json()) as Record<string, unknown>;
+    } else if (
+      ct.includes("multipart/form-data") ||
+      ct.includes("application/x-www-form-urlencoded")
+    ) {
+      const fd = await req.formData();
+      raw = Object.fromEntries(fd.entries());
+    }
+
+    const rolesRaw = raw.roles;
+    let roles: string[] = [];
+
+    if (Array.isArray(rolesRaw)) {
+      roles = rolesRaw.map((v) => normalize(v)).filter(Boolean);
+    } else if (typeof rolesRaw === "string") {
+      // Handle comma- or space-separated roles
+      roles = rolesRaw
+        .split(/,|\s+/)
+        .map((r) => normalize(r))
+        .filter(Boolean);
+    }
+
+    const payload = {
+      name: normalize(raw.name),
+      email: normalize(raw.email),
+      phone: normalize(raw.phone),
+      city: normalize(raw.city),
+      age: normalize(raw.age),
+      availability: normalize(raw.availability),
+      roles,
+      references_text: normalize(raw.references_text ?? raw.references),
+      experience: normalize(raw.experience),
     };
 
-    if (!row.full_name || !row.email) {
+    if (!payload.name && !payload.email) {
       return NextResponse.json({ error: "Name and Email are required." }, { status: 400 });
     }
 
-    const supabase = createClient(url, key);
-    const { error } = await supabase.from("workers").insert(row);
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
+    const { error } = await supabase.from("workers").insert([
+      {
+        name: payload.name,
+        email: payload.email,
+        phone: payload.phone,
+        city: payload.city,
+        age: payload.age,
+        availability: payload.availability,
+        roles: payload.roles, // text[] column expects array
+        references_text: payload.references_text,
+        experience: payload.experience,
+        status: "new",
+      },
+    ]);
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
     return NextResponse.json({ ok: true });
-  } catch (e: unknown) {
-    return NextResponse.json({ error: (typeof e === 'object' && e && 'message' in e ? (e as Error).message : (typeof e === 'string' ? e : 'Unknown error')) }, { status: 500 });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Unknown error";
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

@@ -1,4 +1,4 @@
-import ApplyForm from "./ApplyForm";
+import ApplyFormClient from "./ApplyFormClient";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from '@/lib/supabase';
 
@@ -66,7 +66,7 @@ export default async function EventPoolPage() {
 
       <h2 id="apply" className="mt-14 text-2xl font-semibold">Apply to Join the Pool</h2>
       <div className="mt-6">
-        <ApplyForm />
+        <ApplyFormClient />
       </div>
     </main>
   );
