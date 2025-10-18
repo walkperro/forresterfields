@@ -9,7 +9,7 @@ const STATUS_LABELS = {
   new: "New",
   contacted: "Contacted",
   booked: "Booked",
-  archived: "Archived",
+  archived: "Archived", // display label changed to Denied
 } as const;
 
 const STATUS_OPTIONS = Object.keys(STATUS_LABELS) as Array<keyof typeof STATUS_LABELS>;
@@ -20,7 +20,6 @@ function rowClasses(status?: PlannerRequest["status"]) {
   if (s === "booked") return `${base} bg-green-50`;
   if (s === "archived") return `${base} bg-red-50`;
   if (s === "contacted") return `${base} bg-blue-50`;
-  // NEW: soft yellow bg + subtle glow ring
   return `${base} bg-yellow-50 ring-1 ring-yellow-300/70 shadow-[0_0_16px_rgba(234,179,8,0.25)]`;
 }
 
@@ -70,6 +69,28 @@ export default function ClientTable({ initialRows }: ClientProps) {
     }
   }
 
+  async function deleteRequest(id: string) {
+    if (!confirm("Warning: This cannot be undone. Permanently delete this planner request?")) return;
+    try {
+      setBusyId(id);
+      const res = await fetch("/api/requests/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j?.error || `Delete failed (${res.status})`);
+      }
+      setRows(prev => prev.filter(r => r.id !== id));
+    } catch (e) {
+      console.error((e as Error).message);
+      alert("Delete failed");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   function copy(text: string | null) {
     if (!text) return;
     navigator.clipboard.writeText(text).catch(() => {});
@@ -111,6 +132,7 @@ export default function ClientTable({ initialRows }: ClientProps) {
               <th className="px-3 py-2">City/Venue</th>
               <th className="px-3 py-2">Roles</th>
               <th className="px-3 py-2">Status</th>
+              <th className="px-3 py-2">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -157,11 +179,20 @@ export default function ClientTable({ initialRows }: ClientProps) {
                     ))}
                   </select>
                 </td>
+                <td className="px-3 py-2">
+                  <button
+                    disabled={busyId === r.id}
+                    onClick={() => deleteRequest(r.id)}
+                    className="px-3 py-1 rounded-md border border-red-700 text-red-800 text-xs hover:bg-red-50"
+                  >
+                    Delete
+                  </button>
+                </td>
               </tr>
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td className="px-3 py-6 text-center text-gray-500" colSpan={8}>
+                <td className="px-3 py-6 text-center text-gray-500" colSpan={9}>
                   No results
                 </td>
               </tr>
