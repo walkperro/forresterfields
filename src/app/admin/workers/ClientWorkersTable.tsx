@@ -21,21 +21,25 @@ export type WorkerRow = {
 const ALL_STATUSES = ["new", "contacted", "booked", "archived"] as const;
 type Status = WorkerRow["status"];
 
+function normalizeStatus(s: unknown): Status {
+  const v = String(s ?? "").trim().toLowerCase();
+  return (ALL_STATUSES as readonly string[]).includes(v) ? (v as Status) : "new";
+}
+
 function rowBg(status: Status) {
   switch (status) {
-    case "booked":
-      return "bg-green-50";
-    case "contacted":
-      return "bg-blue-50";
-    case "archived":
-      return "bg-red-50";
-    default:
-      return "bg-yellow-50";
+    case "booked": return "bg-green-50";
+    case "contacted": return "bg-blue-50";
+    case "archived": return "bg-red-50";
+    default: return "bg-yellow-50";
   }
 }
 
 export default function ClientWorkersTable({ data }: { data: WorkerRow[] }) {
-  const [rows, setRows] = useState<WorkerRow[]>(useMemo(() => data, [data]));
+  const [rows, setRows] = useState<WorkerRow[]>(useMemo(
+    () => data.map(r => ({ ...r, status: normalizeStatus(r.status) })),
+    [data]
+  ));
   const [busyId, setBusyId] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<"all" | Status>("all");
@@ -45,28 +49,14 @@ export default function ClientWorkersTable({ data }: { data: WorkerRow[] }) {
     return rows.filter((r) => {
       const okStatus = status === "all" ? true : r.status === status;
       if (!needle) return okStatus;
-      const hay = [
-        r.name,
-        r.email,
-        r.phone,
-        r.city,
-        r.roles,
-        r.references_text,
-        r.experience,
-        r.availability,
-      ]
+      const hay = [r.name, r.email, r.phone, r.city, r.roles, r.references_text, r.experience, r.availability]
         .join(" ")
         .toLowerCase();
       return okStatus && hay.includes(needle);
     });
   }, [rows, q, status]);
 
-  async function postUpdate(payload: {
-    id: string;
-    status?: Status;
-    decision?: "accept" | "deny";
-    note?: string;
-  }) {
+  async function postUpdate(payload: { id: string; status?: Status }) {
     const res = await fetch("/api/workers/update", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -81,28 +71,37 @@ export default function ClientWorkersTable({ data }: { data: WorkerRow[] }) {
   async function changeStatus(id: string, newStatus: Status) {
     setBusyId(id);
     const prev = rows;
+    const ns = normalizeStatus(newStatus);
     try {
-      setRows((rs) => rs.map((r) => (r.id === id ? { ...r, status: newStatus } : r)));
-      await postUpdate({ id, status: newStatus });
+      // Optimistic UI update
+      setRows((rs) => rs.map((r) => (r.id === id ? { ...r, status: ns } : r)));
+      await postUpdate({ id, status: ns });
     } catch (e) {
+      // Roll back if API fails
       setRows(prev);
-      console.error("Silenced alert:", (e as Error).message);
+      console.error("Status update failed:", (e as Error).message);
+      alert("Failed to update status");
     } finally {
       setBusyId(null);
     }
   }
 
-  async function decide(id: string, decision: "accept" | "deny") {
-    const note = window.prompt(`Optional note to include in the ${decision} email:`) || "";
-    setBusyId(id);
-    const prev = rows;
+  async function deleteWorker(id: string) {
     try {
-      const mapped: Status = decision === "accept" ? "booked" : "archived";
-      setRows((rs) => rs.map((r) => (r.id === id ? { ...r, status: mapped } : r)));
-      await postUpdate({ id, decision, status: mapped, note });
+      setBusyId(id);
+      const res = await fetch("/api/workers/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j?.error || `Delete failed (${res.status})`);
+      }
+      setRows((prev) => prev.filter((r) => r.id !== id));
     } catch (e) {
-      setRows(prev);
-      console.error("Silenced alert:", (e as Error).message);
+      console.error((e as Error).message);
+      alert("Delete failed");
     } finally {
       setBusyId(null);
     }
@@ -125,9 +124,7 @@ export default function ClientWorkersTable({ data }: { data: WorkerRow[] }) {
         >
           <option value="all">All statuses</option>
           {ALL_STATUSES.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
+            <option key={s} value={s}>{s}</option>
           ))}
         </select>
       </div>
@@ -171,46 +168,30 @@ export default function ClientWorkersTable({ data }: { data: WorkerRow[] }) {
                     onChange={(e) => changeStatus(r.id, e.target.value as Status)}
                   >
                     {ALL_STATUSES.map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
+                      <option key={s} value={s}>{s}</option>
                     ))}
                   </select>
                 </td>
                 <td className="px-4 py-3">
                   {new Date(r.created_at).toLocaleString(undefined, {
-                    year: "numeric",
-                    month: "short",
-                    day: "2-digit",
-                    hour: "2-digit",
-                    minute: "2-digit",
+                    year: "numeric", month: "short", day: "2-digit",
+                    hour: "2-digit", minute: "2-digit",
                   })}
                 </td>
                 <td className="px-4 py-3">
-                  <div className="flex gap-2">
-                    <button
-                      disabled={busyId === r.id}
-                      className="px-3 py-1 rounded-md border border-green-700 text-green-800 text-xs hover:bg-green-50"
-                      onClick={() => decide(r.id, "accept")}
-                    >
-                      Accept
-                    </button>
-                    <button
-                      disabled={busyId === r.id}
-                      className="px-3 py-1 rounded-md border border-red-700 text-red-800 text-xs hover:bg-red-50"
-                      onClick={() => decide(r.id, "deny")}
-                    >
-                      Deny
-                    </button>
-                  </div>
+                  <button
+                    disabled={busyId === r.id}
+                    className="px-3 py-1 rounded-md border border-red-700 text-red-800 text-xs hover:bg-red-50"
+                    onClick={(e) => { (e.currentTarget as HTMLButtonElement).blur(); deleteWorker(r.id); }}
+                  >
+                    Delete
+                  </button>
                 </td>
               </tr>
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td className="px-4 py-12 text-gray-500" colSpan={12}>
-                  No worker applications match your filters.
-                </td>
+                <td className="px-4 py-12 text-gray-500" colSpan={12}>No worker applications match your filters.</td>
               </tr>
             )}
           </tbody>
