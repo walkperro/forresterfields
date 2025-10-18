@@ -18,7 +18,7 @@ type WorkerDB = {
   experience?: string | null;
   city?: string | null;
   age?: number | null;
-  status?: string | null;
+  status?: string | null; // may be legacy values like "archived"
 };
 
 function getAdmin() {
@@ -34,7 +34,9 @@ async function getWorkers(): Promise<WorkerRow[]> {
 
   const { data } = await supabase
     .from("workers")
-    .select("id, created_at, name, full_name, email, phone, availability, roles, references_text, experience, city, age, status")
+    .select(
+      "id, created_at, name, full_name, email, phone, availability, roles, references_text, experience, city, age, status"
+    )
     .order("created_at", { ascending: false });
 
   const rows: WorkerDB[] = (data ?? []) as WorkerDB[];
@@ -43,13 +45,25 @@ async function getWorkers(): Promise<WorkerRow[]> {
       (r.full_name ?? r.name ?? "").trim() ||
       [r.full_name, r.name].filter(Boolean).join(" ").trim();
 
-    const rolesJoined =
-      Array.isArray(r.roles) ? r.roles.join(", ") : (r.roles as unknown as string) ?? "";
+    const rolesJoined = Array.isArray(r.roles)
+      ? r.roles.join(", ")
+      : ((r.roles as unknown as string) ?? "");
 
-    const normalizedStatus: WorkerRow["status"] = (["new", "contacted", "booked", "archived"] as const).includes(
-      (r.status ?? "new") as WorkerRow["status"]
+    // Accept the new set of statuses; remap legacy "archived" -> "denied"
+    const rawStatus = (r.status === "archived" ? "denied" : r.status) ?? "new";
+    const allowed = [
+      "new",
+      "contacted",
+      "booked",
+      "denied",
+      "available",
+      "unavailable",
+    ] as const;
+
+    const normalizedStatus: WorkerRow["status"] = (allowed as readonly string[]).includes(
+      rawStatus
     )
-      ? (r.status as WorkerRow["status"])
+      ? (rawStatus as WorkerRow["status"])
       : "new";
 
     return {
@@ -63,7 +77,7 @@ async function getWorkers(): Promise<WorkerRow[]> {
       references_text: r.references_text ?? "",
       experience: r.experience ?? "",
       city: r.city ?? "",
-      age: typeof r.age === "number" ? String(r.age) : (r.age ?? "") as string,
+      age: typeof r.age === "number" ? String(r.age) : ((r.age ?? "") as string),
       status: normalizedStatus,
     };
   });
@@ -79,17 +93,17 @@ export default async function WorkersPage() {
         <CsvButton
           rows={rows as unknown as Record<string, unknown>[]}
           columns={[
-            { key: "created_at",   label: "Created" },
-            { key: "name",         label: "Name" },
-            { key: "email",        label: "Email" },
-            { key: "phone",        label: "Phone" },
-            { key: "city",         label: "City" },
-            { key: "age",          label: "Age" },
+            { key: "created_at", label: "Created" },
+            { key: "name", label: "Name" },
+            { key: "email", label: "Email" },
+            { key: "phone", label: "Phone" },
+            { key: "city", label: "City" },
+            { key: "age", label: "Age" },
             { key: "availability", label: "Availability" },
-            { key: "roles",        label: "Roles" },
-            { key: "status",       label: "Status" }
+            { key: "roles", label: "Roles" },
+            { key: "status", label: "Status" },
           ]}
-          filename={`workers-${new Date().toISOString().slice(0,10)}.csv`}
+          filename={`workers-\${new Date().toISOString().slice(0, 10)}.csv`}
           label="Download CSV"
         />
       </div>

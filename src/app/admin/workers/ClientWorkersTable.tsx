@@ -15,31 +15,31 @@ export type WorkerRow = {
   experience: string;
   city: string;
   age: string;
-  status: "new" | "contacted" | "booked" | "archived";
+  status: "new" | "contacted" | "booked" | "denied" | "available" | "unavailable";
 };
 
-const ALL_STATUSES = ["new", "contacted", "booked", "archived"] as const;
+const ALL_STATUSES = ["new","contacted","booked","denied","available","unavailable"] as const;
 type Status = WorkerRow["status"];
-
-function normalizeStatus(s: unknown): Status {
-  const v = String(s ?? "").trim().toLowerCase();
-  return (ALL_STATUSES as readonly string[]).includes(v) ? (v as Status) : "new";
-}
 
 function rowBg(status: Status) {
   switch (status) {
-    case "booked": return "bg-green-50";
-    case "contacted": return "bg-blue-50";
-    case "archived": return "bg-red-50";
-    default: return "bg-yellow-50";
+    case "booked":
+      return "bg-purple-50";
+    case "contacted":
+      return "bg-blue-50";
+    case "denied":
+      return "bg-rose-50";
+    case "available":
+      return "bg-green-50";
+    case "unavailable":
+      return "bg-gray-100";
+    default:
+      return "bg-yellow-50";
   }
 }
 
 export default function ClientWorkersTable({ data }: { data: WorkerRow[] }) {
-  const [rows, setRows] = useState<WorkerRow[]>(useMemo(
-    () => data.map(r => ({ ...r, status: normalizeStatus(r.status) })),
-    [data]
-  ));
+  const [rows, setRows] = useState<WorkerRow[]>(useMemo(() => data, [data]));
   const [busyId, setBusyId] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<"all" | Status>("all");
@@ -49,14 +49,17 @@ export default function ClientWorkersTable({ data }: { data: WorkerRow[] }) {
     return rows.filter((r) => {
       const okStatus = status === "all" ? true : r.status === status;
       if (!needle) return okStatus;
-      const hay = [r.name, r.email, r.phone, r.city, r.roles, r.references_text, r.experience, r.availability]
-        .join(" ")
-        .toLowerCase();
+      const hay = [
+        r.name, r.email, r.phone, r.city, r.roles, r.references_text, r.experience, r.availability,
+      ].join(" ").toLowerCase();
       return okStatus && hay.includes(needle);
     });
   }, [rows, q, status]);
 
-  async function postUpdate(payload: { id: string; status?: Status }) {
+  async function postUpdate(payload: {
+    id: string;
+    status?: Status;
+  }) {
     const res = await fetch("/api/workers/update", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -71,22 +74,20 @@ export default function ClientWorkersTable({ data }: { data: WorkerRow[] }) {
   async function changeStatus(id: string, newStatus: Status) {
     setBusyId(id);
     const prev = rows;
-    const ns = normalizeStatus(newStatus);
     try {
-      // Optimistic UI update
-      setRows((rs) => rs.map((r) => (r.id === id ? { ...r, status: ns } : r)));
-      await postUpdate({ id, status: ns });
+      setRows((rs) => rs.map((r) => (r.id === id ? { ...r, status: newStatus } : r)));
+      await postUpdate({ id, status: newStatus });
     } catch (e) {
-      // Roll back if API fails
       setRows(prev);
-      console.error("Status update failed:", (e as Error).message);
       alert("Failed to update status");
+      console.error((e as Error).message);
     } finally {
       setBusyId(null);
     }
   }
 
   async function deleteWorker(id: string) {
+    if (!confirm("Warning: This action cannot be undone. Permanently delete this applicant?")) return;
     try {
       setBusyId(id);
       const res = await fetch("/api/workers/delete", {
@@ -98,7 +99,7 @@ export default function ClientWorkersTable({ data }: { data: WorkerRow[] }) {
         const j = await res.json().catch(() => ({}));
         throw new Error(j?.error || `Delete failed (${res.status})`);
       }
-      setRows((prev) => prev.filter((r) => r.id !== id));
+      setRows(prev => prev.filter(r => r.id !== id));
     } catch (e) {
       console.error((e as Error).message);
       alert("Delete failed");
@@ -124,7 +125,9 @@ export default function ClientWorkersTable({ data }: { data: WorkerRow[] }) {
         >
           <option value="all">All statuses</option>
           {ALL_STATUSES.map((s) => (
-            <option key={s} value={s}>{s}</option>
+            <option key={s} value={s}>
+              {s}
+            </option>
           ))}
         </select>
       </div>
@@ -168,21 +171,26 @@ export default function ClientWorkersTable({ data }: { data: WorkerRow[] }) {
                     onChange={(e) => changeStatus(r.id, e.target.value as Status)}
                   >
                     {ALL_STATUSES.map((s) => (
-                      <option key={s} value={s}>{s}</option>
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
                     ))}
                   </select>
                 </td>
                 <td className="px-4 py-3">
                   {new Date(r.created_at).toLocaleString(undefined, {
-                    year: "numeric", month: "short", day: "2-digit",
-                    hour: "2-digit", minute: "2-digit",
+                    year: "numeric",
+                    month: "short",
+                    day: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit",
                   })}
                 </td>
                 <td className="px-4 py-3">
                   <button
                     disabled={busyId === r.id}
                     className="px-3 py-1 rounded-md border border-red-700 text-red-800 text-xs hover:bg-red-50"
-                    onClick={(e) => { (e.currentTarget as HTMLButtonElement).blur(); deleteWorker(r.id); }}
+                    onClick={() => deleteWorker(r.id)}
                   >
                     Delete
                   </button>
@@ -191,7 +199,9 @@ export default function ClientWorkersTable({ data }: { data: WorkerRow[] }) {
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td className="px-4 py-12 text-gray-500" colSpan={12}>No worker applications match your filters.</td>
+                <td className="px-4 py-12 text-gray-500" colSpan={12}>
+                  No worker applications match your filters.
+                </td>
               </tr>
             )}
           </tbody>
