@@ -219,3 +219,21 @@ export default function ClientWorkersTable({ data }: { data: WorkerRow[] }) {
     </div>
   );
 }
+
+// --- AUTO-ADDED: Email Applicant Button ---
+function EmailApplicantButton({ id }: { id: string }) {
+  async function sendEmail() {
+    const note = prompt("Optional note to include in the acceptance email:");
+    await fetch("/api/send-decision", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, decision: "accept", note }),
+    });
+    alert("Email sent!");
+  }
+  return (
+    <button onClick={sendEmail} className="px-3 py-1 rounded-md border text-xs hover:bg-gray-50">
+      Email Applicant
+    </button>
+  );
+}

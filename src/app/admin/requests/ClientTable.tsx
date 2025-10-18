@@ -172,3 +172,21 @@ export default function ClientTable({ initialRows }: ClientProps) {
     </div>
   );
 }
+
+// --- AUTO-ADDED: Email Planner Button ---
+function EmailPlannerButton({ id }: { id: string }) {
+  async function sendEmail() {
+    const note = prompt("Optional message to include in the planner email:");
+    await fetch("/api/send-decision", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, decision: "accept", note }),
+    });
+    alert("Planner email sent!");
+  }
+  return (
+    <button onClick={sendEmail} className="px-2 py-1 rounded-md border text-xs hover:bg-gray-50">
+      Email Planner
+    </button>
+  );
+}
