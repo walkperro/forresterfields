@@ -29,7 +29,9 @@ export default async function WorkersPage() {
   const { data: jobs, error } = await supabase
     .from("jobs")
     .select("*")
-    .order("event_date", { ascending: true });
+  .eq("status", "open")
+    .order("created_at", { ascending: false, nullsFirst: false })
+  .order("event_date", { ascending: true, nullsFirst: false });
 
   const rows = (jobs ?? []) as JobRow[];
 

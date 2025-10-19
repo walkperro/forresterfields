@@ -49,7 +49,8 @@ export default async function AdminJobsPage() {
   const { data, error } = await supabase
     .from("jobs")
     .select("*")
-    .order("event_date", { ascending: true });
+    .order("created_at", { ascending: false, nullsFirst: false })
+  .order("event_date", { ascending: true, nullsFirst: false });
 
   const normalizedRows: JobRow[] = (data as unknown[] | null ?? []).map((raw) => {
     const r = raw as Record<string, unknown>;
