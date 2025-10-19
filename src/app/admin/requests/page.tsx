@@ -24,6 +24,7 @@ export default async function Page() {
   return (
     <div className="max-w-5xl mx-auto px-4 py-10">
       <h1 className="font-['Playfair_Display'] text-[2rem] font-light tracking-tight text-slate-800"><span className="block mb-6">Planner Requests</span></h1>
+      <AdminNav active="requests" />
 
       <div className="mb-4 flex items-center gap-3">
         <CsvButton
@@ -43,7 +44,6 @@ export default async function Page() {
         />
       </div>
 
-      <AdminNav />
       <div className="mt-6">
         <ClientTable initialRows={rows} />
       </div>

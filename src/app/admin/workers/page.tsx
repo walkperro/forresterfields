@@ -88,6 +88,7 @@ export default async function WorkersPage() {
   return (
     <div className="max-w-5xl mx-auto px-4 py-10">
       <h1 className="font-['Playfair_Display'] text-[2rem] font-light tracking-tight text-slate-800 mb-6">Workers</h1>
+      <AdminNav active="workers" />
 
       <div className="mb-4 flex items-center gap-3">
         <CsvButton
@@ -108,7 +109,6 @@ export default async function WorkersPage() {
         />
       </div>
 
-      <AdminNav />
       <div className="mt-6">
         <ClientWorkersTable data={rows} />
       </div>
