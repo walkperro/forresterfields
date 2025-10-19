@@ -3,7 +3,7 @@ import Link from "next/link";
 export default function AdminIndex() {
   return (
     <main className="max-w-5xl mx-auto px-4 py-12">
-      <h1 className="text-4xl font-serif font-semibold tracking-tight">Admin</h1>
+      <h1 className="font-['Playfair_Display'] text-[2rem] font-light tracking-tight text-slate-800 mb-6">Admin</h1>
       <p className="mt-2 text-slate-600">Choose a section:</p>
 
       <div className="mt-6 grid gap-4">
