@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import AdminJobsClient from "./AdminJobsClient";
+import AdminNav from "@/components/AdminNav";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -72,6 +73,7 @@ export default async function AdminJobsPage() {
   return (
     <main className="max-w-5xl mx-auto px-4 py-12">
       <h1 className="font-['Playfair_Display'] text-[2rem] font-light tracking-tight text-slate-800 mb-6">Job Posts</h1>
+      <AdminNav active="jobs" />
       <p className="mt-2 text-slate-600">Create and manage roles that appear on the Workers page.</p>
 
       {error && (

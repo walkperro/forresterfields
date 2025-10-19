@@ -1,40 +1,30 @@
+
 "use client";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 
-const linkBase =
-  "inline-flex items-center rounded-lg px-3 py-2 text-sm font-medium border";
-const active =
-  "border-gray-900 text-gray-900 bg-gray-100";
-const inactive =
-  "border-gray-300 text-gray-700 hover:bg-gray-50";
+type Tab = "home" | "requests" | "workers" | "jobs";
 
-export default function AdminNav() {
-  const pathname = usePathname();
-  const isReq = pathname?.startsWith("/admin/requests");
-  const isWorkers = pathname?.startsWith("/admin/workers");
-  const isHome = pathname === "/admin";
+export default function AdminNav({ active }: { active?: Tab }) {
+  const base = "border rounded-md px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-0";
+  const activeCls = "bg-slate-100 border-slate-300 text-slate-900";
+  const idleCls = "border-slate-300";
+
+  const Item = ({ href, label, tab }: { href: string; label: string; tab: Tab }) => (
+    <Link
+      href={href}
+      aria-current={active === tab ? "page" : undefined}
+      className={[base, active === tab ? activeCls : idleCls].join(" ")}
+    >
+      {label}
+    </Link>
+  );
 
   return (
-    <nav className="flex gap-3">
-      <Link
-        href="/admin"
-        className={`${linkBase} ${isHome ? active : inactive}`}
-      >
-        Admin Home
-      </Link>
-      <Link
-        href="/admin/requests"
-        className={`${linkBase} ${isReq ? active : inactive}`}
-      >
-        Planner Requests
-      </Link>
-      <Link
-        href="/admin/workers"
-        className={`${linkBase} ${isWorkers ? active : inactive}`}
-      >
-        Workers
-      </Link>
-    </nav>
+    <div className="admin-nav flex flex-wrap gap-2 mt-4 mb-8">
+      <Item href="/admin" label="Admin Home" tab="home" />
+      <Item href="/admin/requests" label="Planner Requests" tab="requests" />
+      <Item href="/admin/workers" label="Workers" tab="workers" />
+      <Item href="/admin/jobs" label="Job Posts" tab="jobs" />
+    </div>
   );
 }
