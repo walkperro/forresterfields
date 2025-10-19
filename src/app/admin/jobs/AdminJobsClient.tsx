@@ -8,7 +8,7 @@ export type JobRow = {
   title: string | null;
   event_date: string | null;
   location: string | null;
-  roles: string[];            // text[] in supabase
+  roles: string[];           // text[] in supabase (normalized in server)
   pay: string | null;
   start_time: string | null;
   end_time: string | null;
@@ -19,7 +19,9 @@ export type JobRow = {
 type Props = { initialJobs: JobRow[] };
 
 export default function AdminJobsClient({ initialJobs }: Props) {
-  const [jobs, setJobs] = useState<JobRow[]>(Array.isArray(initialJobs) ? initialJobs : []);
+  const [jobs, setJobs] = useState<JobRow[]>(
+    Array.isArray(initialJobs) ? initialJobs : []
+  );
   const [busy, setBusy] = useState(false);
 
   async function handleCreate(e: React.FormEvent<HTMLFormElement>) {
@@ -27,14 +29,18 @@ export default function AdminJobsClient({ initialJobs }: Props) {
     if (busy) return;
     setBusy(true);
 
+    // 🔧 keep a stable reference to the form BEFORE any await calls
+    const form = e.currentTarget;
+
     try {
-      const fd = new FormData(e.currentTarget);
+      const fd = new FormData(form);
       const res = await fetch("/api/jobs/create", { method: "POST", body: fd });
       const j = await res.json();
       if (!res.ok || !j?.ok) throw new Error(j?.error || `Create failed (${res.status})`);
+
       const newJob: JobRow = j.job;
-      setJobs(prev => [newJob, ...prev]);          // show immediately
-      e.currentTarget.reset();
+      setJobs((prev) => [newJob, ...prev]); // optimistic add
+      form.reset(); // safe now because we cached the node
     } catch (err) {
       alert((err as Error).message || "Create failed");
     } finally {
@@ -45,7 +51,7 @@ export default function AdminJobsClient({ initialJobs }: Props) {
   async function handleDelete(id: string) {
     if (!confirm("Delete this job?")) return;
     const prev = jobs;
-    setJobs(prev.filter(j => j.id !== id));        // optimistic UI
+    setJobs(prev.filter((j) => j.id !== id)); // optimistic
     try {
       const res = await fetch("/api/jobs/delete", {
         method: "POST",
@@ -55,14 +61,14 @@ export default function AdminJobsClient({ initialJobs }: Props) {
       const j = await res.json().catch(() => ({}));
       if (!res.ok || !j?.ok) throw new Error(j?.error || `Delete failed (${res.status})`);
     } catch (err) {
-      setJobs(prev); // revert on failure
+      setJobs(prev); // rollback
       alert((err as Error).message || "Delete failed");
     }
   }
 
   async function handleStatus(id: string, status: JobRow["status"]) {
     const prev = jobs;
-    setJobs(prev.map(j => (j.id === id ? { ...j, status } : j)));
+    setJobs(prev.map((j) => (j.id === id ? { ...j, status } : j)));
     try {
       const res = await fetch("/api/jobs/update", {
         method: "POST",
@@ -72,7 +78,7 @@ export default function AdminJobsClient({ initialJobs }: Props) {
       const j = await res.json().catch(() => ({}));
       if (!res.ok || !j?.ok) throw new Error(j?.error || `Update failed (${res.status})`);
     } catch (err) {
-      setJobs(prev); // revert
+      setJobs(prev); // rollback
       alert((err as Error).message || "Update failed");
     }
   }
@@ -113,7 +119,8 @@ export default function AdminJobsClient({ initialJobs }: Props) {
               <th className="px-3 py-2">Roles</th>
               <th className="px-3 py-2">Pay</th>
               <th className="px-3 py-2">Time</th>
-              <th className="px-3 py-2 hidden md:table-cell">Notes</th>
+              {/* Notes now always visible */}
+              <th className="px-3 py-2">Notes</th>
               <th className="px-3 py-2">Status</th>
               <th className="px-3 py-2">Actions</th>
             </tr>
@@ -124,9 +131,8 @@ export default function AdminJobsClient({ initialJobs }: Props) {
                 <td className="px-3 py-4 text-gray-500" colSpan={9}>No jobs yet.</td>
               </tr>
             )}
-            {jobs.map(j => {
-              const time =
-                [j.start_time, j.end_time].filter(Boolean).join(" – ") || "—";
+            {jobs.map((j) => {
+              const time = [j.start_time, j.end_time].filter(Boolean).join(" – ") || "—";
               const roles = Array.isArray(j.roles) ? j.roles.join(", ") : "—";
               return (
                 <tr key={j.id} className="border-t">
@@ -136,7 +142,7 @@ export default function AdminJobsClient({ initialJobs }: Props) {
                   <td className="px-3 py-2">{roles}</td>
                   <td className="px-3 py-2">{j.pay ?? "—"}</td>
                   <td className="px-3 py-2">{time}</td>
-                  <td className="px-3 py-2 hidden md:table-cell max-w-[18rem]">
+                  <td className="px-3 py-2 max-w-[18rem]">
                     <span className="line-clamp-2">{j.notes ?? "—"}</span>
                   </td>
                   <td className="px-3 py-2">
