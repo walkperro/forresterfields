@@ -1,3 +1,4 @@
+import HeroVideo from "@/components/HeroVideo";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -16,30 +17,7 @@ export default function Home() {
   return (
     <main>
       {/* HERO */}
-      <section className="relative">
-        <Image
-          src="https://picsum.photos/seed/forrester-hero/2400/1400"
-          alt="Lakeside ceremony"
-          width={2400}
-          height={1400}
-          priority
-          className="h-[72vh] w-full object-cover"
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-black/35 to-black/40" />
-        <div className="absolute inset-0 flex items-center">
-          <div className="container text-white text-center">
-            <h1 className="font-display text-4xl md:text-6xl">Unforgettable Lakeside Weddings</h1>
-            <p className="mt-4 text-lg md:text-xl max-w-2xl mx-auto">
-              Private venue in Loganville serving Walton County &amp; the Greater Atlanta area — full planning,
-              month-of, and day-of coordination.
-            </p>
-            <div className="mt-6 flex gap-3 justify-center">
-              <Link href="/contact" className="btn btn-primary">Schedule a Tour</Link>
-              <Link href="/services" className="btn btn-outline">View Packages</Link>
-            </div>
-          </div>
-        </div>
-      </section>
+      <HeroVideo />
 
       {/* VALUE PROPS */}
       <section className="section">
