@@ -1,26 +1,27 @@
-import "./admin.css";
-import "./admin-ui.css";
 import Link from "next/link";
 
-export const dynamic = "force-dynamic";
-
-export default function AdminHome() {
+export default function AdminIndex() {
   return (
-    <div className="container py-10">
-      <h1 className="font-display text-3xl">Admin</h1>
-      <p className="text-gray-600 mt-2">Choose a section:</p>
+    <main className="max-w-5xl mx-auto px-4 py-12">
+      <h1 className="text-4xl font-serif font-semibold tracking-tight">Admin</h1>
+      <p className="mt-2 text-slate-600">Choose a section:</p>
 
-      <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Link href="/admin/requests" className="rounded-xl border p-6 hover:bg-gray-50 block">
-          <div className="text-lg font-semibold">Planner Requests</div>
-          <div className="text-gray-600">Review & track inbound planner requests.</div>
+      <div className="mt-6 grid gap-4">
+        <Link href="/admin/requests" className="block rounded-xl border p-6 bg-white hover:bg-gray-50">
+          <div className="text-xl font-semibold">Planner Requests</div>
+          <div className="text-gray-600 mt-1">Review & track inbound planner requests.</div>
         </Link>
 
-        <Link href="/admin/workers" className="rounded-xl border p-6 hover:bg-gray-50 block">
-          <div className="text-lg font-semibold">Workers</div>
-          <div className="text-gray-600">Review applications and manage status.</div>
+        <Link href="/admin/workers" className="block rounded-xl border p-6 bg-white hover:bg-gray-50">
+          <div className="text-xl font-semibold">Workers</div>
+          <div className="text-gray-600 mt-1">Review applications and manage status.</div>
+        </Link>
+
+        <Link href="/admin/jobs" className="block rounded-xl border p-6 bg-white hover:bg-gray-50">
+          <div className="text-xl font-semibold">Job Posts</div>
+          <div className="text-gray-600 mt-1">Create, open/close, and delete worker roles.</div>
         </Link>
       </div>
-    </div>
+    </main>
   );
 }
