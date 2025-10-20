@@ -4,15 +4,15 @@ import Link from "next/link";
 
 export default function Home() {
   const PREVIEW = [
-    "https://picsum.photos/seed/ff1/1200/800",
-    "https://picsum.photos/seed/ff2/1200/800",
-    "https://picsum.photos/seed/ff3/1200/800",
-    "https://picsum.photos/seed/ff4/1200/800",
-    "https://picsum.photos/seed/ff5/1200/800",
-    "https://picsum.photos/seed/ff6/1200/800",
-    "https://picsum.photos/seed/ff7/1200/800",
-    "https://picsum.photos/seed/ff8/1200/800",
-  ];
+  "/media/forresterfields/rs=w_403,h_537.jpeg",
+  "/media/forresterfields/rs=w_806,h_1148.jpeg",
+  "/media/forresterfields/rs=w_806,h_1209 (3).jpeg",
+  "/media/forresterfields/rs=w_806,h_606.jpeg",
+  "/media/forresterfields/rs=w_806,h_1209 (1).jpeg",
+  "/media/forresterfields/rs=w_806,h_1209 (4).jpeg",
+  "/media/forresterfields/FB_IMG_1760900958514.jpg",
+  "/media/forresterfields/rs=w_806,h_1209.jpeg"
+];
 
   return (
     <main>
@@ -98,23 +98,42 @@ export default function Home() {
       {/* ABOUT: MARISOL */}
       <section className="section bg-white">
         <div className="container text-center">
-          <div className="relative mx-auto w-60 h-60 sm:w-72 sm:h-72 mb-8">
+          <div className="relative mx-auto w-72 h-72 sm:w-80 sm:h-80 md:w-96 md:h-96 mb-8">
             <Image
               src="/media/forresterfields/momndad.jpg"
               alt="Marisol and her husband at the beach at sunset"
               fill
               priority
-              className="rounded-full object-cover brightness-[1.05] contrast-[1.05] saturate-[1.1] shadow-xl ring-1 ring-black/10"
+              className="rounded-full object-cover"
             />
           </div>
 
-          <h2 className="font-display text-3xl md:text-4xl mb-4">About Me, Your Wedding Planner!</h2>
+          <h2 className="font-display text-3xl md:text-4xl mb-4">
+            About Me, Your Wedding Planner!
+          </h2>
 
           <div className="mx-auto max-w-3xl text-gray-700 leading-relaxed">
-            <p>I am blessed to get to do what I love with the support of a wonderful husband of 31 years. We have attended, been a part of and hosted many celebrations and weddings over the years. It&apos;s a dream come true to get to share my ideas and love for weddings and parties with others.</p>
+            <p>
+              I am blessed to get to do what I love with the support of a wonderful
+              husband of 31 years. We have attended, been a part of and hosted many
+              celebrations and weddings over the years. It&apos;s a dream come true to
+              get to share my ideas and love for weddings and parties with others.
+            </p>
+
             <p className="font-semibold mt-4">I was made for this!</p>
-            <blockquote className="italic bg-gray-50 border border-gray-200 rounded-xl p-5 mt-6">“Do not forget to show hospitality to strangers, for by so doing some people have shown hospitality to angels without knowing it.”</blockquote>
-            <p className="mt-2">Hebrews 13:2</p>
+
+            {/* subtle divider */}
+            <div className="mx-auto my-6 h-px w-24 bg-gray-200 rounded-full" />
+
+            <figure className="mt-4">
+              <blockquote className="italic text-gray-800 bg-gray-50 border border-gray-200 rounded-2xl p-6">
+                “Do not forget to show hospitality to strangers, for by so doing some
+                people have shown hospitality to angels without knowing it.”
+                <footer className="mt-3 text-gray-600 not-italic text-sm">
+                  Hebrews 13:2
+                </footer>
+              </blockquote>
+            </figure>
           </div>
         </div>
       </section>
