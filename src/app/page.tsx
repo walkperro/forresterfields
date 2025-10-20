@@ -35,7 +35,39 @@ export default function Home() {
         </div>
       </section>
 
-      {/* GALLERY PREVIEW */}
+      
+      {/* ABOUT FORRESTER FIELDS */}
+      <section className="section">
+        <div className="container grid gap-8 md:grid-cols-[1.2fr_1fr] items-center">
+          <div>
+            <h2 className="font-display text-3xl md:text-4xl">About Forrester Fields</h2>
+            <p className="text-gray-600 mt-4 leading-relaxed">
+              Forrester Fields is a serene, private lakeside venue in Loganville, GA — serving Walton County
+              and the Greater Atlanta area. From full planning to month-of and day-of coordination, our team
+              makes weddings effortless, beautiful, and deeply personal.
+            </p>
+            <p className="text-gray-600 mt-3 leading-relaxed">
+              You’ll find market lights by the water, thoughtful spaces for getting ready, and a warm,
+              dedicated staff focused on a smooth, stress-free day.
+            </p>
+          </div>
+
+          {/* White card with white logo.jpg on white background */}
+          <div className="justify-self-center w-full max-w-sm">
+            <div className="bg-white rounded-2xl shadow-sm ring-1 ring-black/5 p-6 flex items-center justify-center">
+              <img
+                src="/media/forresterfields/logo.jpg"
+                alt="Forrester Fields logo"
+                className="w-56 h-auto object-contain"
+                loading="lazy"
+                decoding="async"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+{/* GALLERY PREVIEW */}
       <section className="section bg-brand-cream/50">
         <div className="container">
           <h2 className="font-display text-3xl">Gallery</h2>

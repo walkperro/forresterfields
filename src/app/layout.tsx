@@ -25,13 +25,16 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
+      <head>
+        <link rel="preload" as="video" href="/media/forresterfields/hero.mp4" type="video/mp4" />
+      </head>
       <body className={`${display.variable} ${inter.variable} font-sans min-h-screen flex flex-col`}>
         <SeoJsonLd />
         <Navbar />
         <div className="flex-1">{children}</div>
         <Footer />
+        {process.env.NEXT_PUBLIC_DEBUG_CLIENT === "1" ? <ClientErrorForwarder /> : null}
       </body>
-      {process.env.NEXT_PUBLIC_DEBUG_CLIENT === "1" ? <ClientErrorForwarder /> : null}
-    </html>
+      </html>
   );
 }

@@ -9,8 +9,8 @@ export default function Navbar(){
     <header className="sticky top-0 z-50 bg-white/90 backdrop-blur border-b">
       <nav className="container h-16 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-3">
-          <Image src="/logo.svg" alt="Forrester Fields" width={110} height={32} priority />
-        </Link>
+    <Image src="/logo.svg" alt="Forrester Fields" width={110} height={32} priority />
+  </Link>
 
         {/* desktop */}
         <div className="hidden md:flex gap-6 items-center text-sm">
