@@ -1,4 +1,6 @@
+
 "use client";
+import Image from "next/image";
 import Link from "next/link";
 
 export default function HeroVideo() {
@@ -16,13 +18,28 @@ export default function HeroVideo() {
         />
       </div>
 
-      {/* Overlay */}
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/60 via-black/20 to-black/80" />
+      {/* Gradient overlay */}
+      <div className="pointer-events-none absolute inset-0 " />
 
-      {/* Text overlay (slightly lower) */}
-      <div className="absolute inset-0 flex flex-col justify-center px-6 md:px-12 text-left mt-6 md:mt-10">
-        <div className="pointer-events-auto text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)] max-w-3xl">
-          <h1 className="font-['Playfair_Display'] text-[2rem] sm:text-[2.75rem] md:text-[3.25rem] leading-snug mb-3">
+      {/* Logo badge (top-right) */}
+      <div className="pointer-events-none absolute right-7 top-1 sm:right-10 sm:top-2 z-[60]">
+        <div className="pointer-events-auto rounded-xl bg-white/20 backdrop-blur px-2.5 py-2 ring-1 ring-black/10 shadow">
+          <div className="relative h-12 w-12 sm:h-14 sm:w-14 rounded-full overflow-hidden">
+  <img
+    src="/media/forresterfields/logo.jpg"
+    alt="ForresterFields"
+    className="absolute inset-0 h-full w-full object-cover scale-[105%] translate-x-[1%] translate-y-[1%]"
+    loading="eager"
+    decoding="async"
+  />
+</div>
+        </div>
+      </div>
+
+      {/* Text overlay (final spacing you liked) */}
+      <div className="absolute inset-0 flex flex-col justify-center px-6 md:px-12 text-left">
+        <div className="pointer-events-auto text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)] max-w-3xl translate-y-[5vh] md:translate-y-[6vh]">
+          <h1 className="font-[Playfair_Display] text-[2rem] sm:text-[2.75rem] md:text-[3.25rem] leading-snug mb-3">
             Unforgettable Lakeside Weddings
           </h1>
 
