@@ -94,6 +94,30 @@ export default function Home() {
           <Link href="/contact" className="btn btn-primary">Get in touch</Link>
         </div>
       </section>
+    
+      {/* ABOUT: MARISOL */}
+      <section className="section bg-white">
+        <div className="container text-center">
+          <div className="relative mx-auto w-60 h-60 sm:w-72 sm:h-72 mb-8">
+            <Image
+              src="/media/forresterfields/momndad.jpg"
+              alt="Marisol and her husband at the beach at sunset"
+              fill
+              priority
+              className="rounded-full object-cover brightness-[1.05] contrast-[1.05] saturate-[1.1] shadow-xl ring-1 ring-black/10"
+            />
+          </div>
+
+          <h2 className="font-display text-3xl md:text-4xl mb-4">About Me, Your Wedding Planner!</h2>
+
+          <div className="mx-auto max-w-3xl text-gray-700 leading-relaxed">
+            <p>I am blessed to get to do what I love with the support of a wonderful husband of 31 years. We have attended, been a part of and hosted many celebrations and weddings over the years. It&apos;s a dream come true to get to share my ideas and love for weddings and parties with others.</p>
+            <p className="font-semibold mt-4">I was made for this!</p>
+            <blockquote className="italic bg-gray-50 border border-gray-200 rounded-xl p-5 mt-6">“Do not forget to show hospitality to strangers, for by so doing some people have shown hospitality to angels without knowing it.”</blockquote>
+            <p className="mt-2">Hebrews 13:2</p>
+          </div>
+        </div>
+      </section>
     </main>
   );
 }
