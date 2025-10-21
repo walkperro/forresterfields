@@ -3,15 +3,15 @@ import Image from "next/image";
 import Link from "next/link";
 
 export default function Home() {
-  const PREVIEW = [
-  "/media/forresterfields/rs=w_403,h_537.jpeg",
-  "/media/forresterfields/rs=w_806,h_1148.jpeg",
-  "/media/forresterfields/rs=w_806,h_1209 (3).jpeg",
-  "/media/forresterfields/rs=w_806,h_606.jpeg",
-  "/media/forresterfields/rs=w_806,h_1209 (1).jpeg",
-  "/media/forresterfields/rs=w_806,h_1209 (4).jpeg",
-  "/media/forresterfields/FB_IMG_1760900958514.jpg",
-  "/media/forresterfields/rs=w_806,h_1209.jpeg"
+    const PREVIEW = [
+  "/media/forresterfields/cupcake1.jpg",
+  "/media/forresterfields/cupcake2.jpg",
+  "/media/forresterfields/cupcake3.jpg",
+  "/media/forresterfields/cupcake4.jpg",
+  "/media/forresterfields/FB_IMG_1760901027010.jpg",
+  "/media/forresterfields/ffieldslogotransparent.png",
+  "/media/forresterfields/momndad.jpg",
+  "/media/forresterfields/theforresters-0185.jpg"
 ];
 
   return (

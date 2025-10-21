@@ -23,7 +23,11 @@ export default function GalleryGrid({ images }: { images: GalleryImage[] }) {
       <div className="relative aspect-[4/3]">
         <Image src={img.src} alt={img.alt} fill placeholder="blur" blurDataURL={BLUR}
           sizes="(max-width:640px)100vw,(max-width:1024px)50vw,33vw"
-          className="object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
+          className="object-cover transition-transform duration-300 group-hover:scale-[1.03]" /
+    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+    loading={i < 4 ? 'eager' : 'lazy'}
+    priority={i < 2}
+  >
       </div>
     </motion.button>
   )),[images]);
