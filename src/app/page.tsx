@@ -6,12 +6,12 @@ export default function Home() {
   const PREVIEW = [
   "/media/forresterfields/rs=w_403,h_537.jpeg",
   "/media/forresterfields/rs=w_806,h_1148.jpeg",
-  "/media/forresterfields/rs=w_806,h_1209 (3).jpeg",
+  "/media/forresterfields/rs=w_806,h_1209%20(3).jpeg",
   "/media/forresterfields/rs=w_806,h_606.jpeg",
   "/media/forresterfields/rs=w_806,h_1209 (1).jpeg",
-  "/media/forresterfields/rs=w_806,h_1209 (4).jpeg",
+  "/media/forresterfields/rs=w_806,h_1209.jpeg",
   "/media/forresterfields/FB_IMG_1760900958514.jpg",
-  "/media/forresterfields/rs=w_806,h_1209.jpeg"
+  "/media/forresterfields/rs=w_806,h_1209 (4).jpeg"
 ];
 
   return (

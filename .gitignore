@@ -10,3 +10,4 @@ public/media/**
 *.m4v
 *.webm
 *.zip
+.vercel
