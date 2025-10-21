@@ -1,36 +1,64 @@
 "use client";
-import Image from "next/image";
-import { useState } from "react";
+import { useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 
-export default function Lightbox({ images }:{images:string[]}) {
-  const [open, setOpen] = useState(false);
-  const [idx, setIdx] = useState(0);
+type Props = {
+  open: boolean;
+  src: string;
+  alt: string;
+  onClose: () => void;
+  onPrev: () => void;
+  onNext: () => void;
+};
+
+export default function Lightbox({ open, src, alt, onClose, onPrev, onNext }: Props) {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      if (e.key === "ArrowLeft") onPrev();
+      if (e.key === "ArrowRight") onNext();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose, onPrev, onNext]);
+
   return (
-    <>
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-        {images.map((src,i)=>(
-          <button key={src} className="group relative" onClick={()=>{setIdx(i);setOpen(true);}}>
-            <Image src={src} alt={`Gallery ${i+1}`} width={1200} height={900}
-              className="h-48 w-full object-cover rounded-md" />
-            <span className="absolute inset-0 rounded-md bg-black/0 group-hover:bg-black/15 transition" />
-          </button>
-        ))}
-      </div>
+    <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur flex items-center justify-center p-4"
-             onClick={()=>setOpen(false)}>
-          <button className="absolute top-4 right-4 text-white text-xl" aria-label="Close">✕</button>
-          <div className="max-w-5xl w-full" onClick={(e)=>e.stopPropagation()}>
-            <Image src={images[idx]} alt={`Image ${idx+1}`} width={2000} height={1500}
-              className="w-full h-auto rounded-lg" priority />
-            <div className="mt-3 flex justify-between text-white/90 text-sm">
-              <button onClick={()=>setIdx((idx-1+images.length)%images.length)}>← Prev</button>
-              <span>{idx+1} / {images.length}</span>
-              <button onClick={()=>setIdx((idx+1)%images.length)}>Next →</button>
-            </div>
-          </div>
-        </div>
+        <motion.div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        >
+          <button
+            aria-label="Close"
+            className="absolute right-4 top-4 rounded-full bg-white/10 px-3 py-2 text-white"
+            onClick={onClose}
+          >✕</button>
+          <button
+            aria-label="Prev"
+            className="absolute left-3 md:left-6 top-1/2 -translate-y-1/2 rounded-full bg-white/10 px-3 py-2 text-white"
+            onClick={onPrev}
+          >‹</button>
+          <motion.img
+            key={src}
+            src={src}
+            alt={alt}
+            className="max-h-[90vh] max-w-[92vw] rounded-2xl shadow-2xl"
+            initial={{ opacity: 0, scale: 0.97 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.98 }}
+            transition={{ duration: 0.25 }}
+          />
+          <button
+            aria-label="Next"
+            className="absolute right-3 md:right-6 top-1/2 -translate-y-1/2 rounded-full bg-white/10 px-3 py-2 text-white"
+            onClick={onNext}
+          >›</button>
+        </motion.div>
       )}
-    </>
+    </AnimatePresence>
   );
 }

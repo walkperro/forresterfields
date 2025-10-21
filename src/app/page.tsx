@@ -55,13 +55,7 @@ export default function Home() {
           {/* White card with white logo.jpg on white background */}
           <div className="justify-self-center w-full max-w-sm">
             <div className="bg-white rounded-2xl shadow-sm ring-1 ring-black/5 p-6 flex items-center justify-center">
-              <img
-                src="/media/forresterfields/logo.jpg"
-                alt="Forrester Fields logo"
-                className="w-56 h-auto object-contain"
-                loading="lazy"
-                decoding="async"
-              />
+              <Image src="/media/forresterfields/logo.jpg" alt="Forrester Fields logo" width={224} height={224} className="w-56 h-auto object-contain" />
             </div>
           </div>
         </div>
