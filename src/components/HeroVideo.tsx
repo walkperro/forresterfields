@@ -12,7 +12,7 @@ export default function HeroVideo() {
           muted
           loop
           playsInline
-          src="/media/forresterfields/hero.mp4"
+          src="/media/forresterfields/hero_21s_streamline.mp4"
         />
       </div>
 

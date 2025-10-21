@@ -1,50 +1,55 @@
 "use client";
 
 import Image from "next/image";
-import { motion, AnimatePresence } from "framer-motion";
+import { useState } from "react";
 import Lightbox from "./Lightbox";
-
-export type GalleryImage = {
-  src: string;
-  alt: string;
-  w?: number;
-  h?: number;
-};
+import type { GalleryImage } from "@/lib/gallery";
 
 const BLUR =
-  "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='14'%3E%3Crect width='100%25' height='100%25' fill='%23eee'/%3E%3C/svg%3E";
+  "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9Ijc1IiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9IiNmMWYxZWYiLz48L3N2Zz4=";
 
 export default function GalleryGrid({ images }: { images: GalleryImage[] }) {
-  const sizes =
-    "(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw";
+  const [open, setOpen] = useState(false);
+  const [index, setIndex] = useState(0);
 
   return (
-    <section className="mx-auto max-w-6xl px-4 pb-16">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {images.map((img, i) => (
-          <figure
-            key={img.src}
-            className="group relative overflow-hidden rounded-2xl bg-white/60 shadow-sm ring-1 ring-black/5"
-          >
-            <div className="relative aspect-[4/3]">
+    <>
+      <section className="mx-auto max-w-6xl px-4 pb-16">
+        {/* 2-column masonry style */}
+        <div className="columns-1 sm:columns-2 gap-4 [column-fill:_balance]">
+          {images.map((img, i) => (
+            <button
+              key={img.src + i}
+              onClick={() => {
+                setIndex(i);
+                setOpen(true);
+              }}
+              className="group mb-4 block w-full overflow-hidden rounded-2xl bg-white/40 ring-1 ring-black/5 transition-all hover:ring-brand-gold"
+            >
               <Image
                 src={img.src}
-                alt={img.alt}
-                fill
+                alt={img.alt || `Forrester Fields photo ${i + 1}`}
+                width={900}
+                height={700}
                 placeholder="blur"
                 blurDataURL={BLUR}
-                sizes={sizes}
-                className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-                loading={i < 4 ? "eager" : "lazy"}
+                className="w-full h-auto object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                sizes="(max-width:768px) 100vw, 50vw"
                 priority={i < 2}
               />
-            </div>
+            </button>
+          ))}
+        </div>
+      </section>
 
-            {/* Lightbox trigger overlay */}
-            <Lightbox images={images} startIndex={i} />
-          </figure>
-        ))}
-      </div>
-    </section>
+      {open && (
+        <Lightbox
+          startIndex={index}
+          images={images}
+          onClose={() => setOpen(false)}
+          onIndexChange={setIndex}
+        />
+      )}
+    </>
   );
 }
