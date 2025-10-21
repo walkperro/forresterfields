@@ -1,18 +1,10 @@
 import HeroVideo from "@/components/HeroVideo";
 import Image from "next/image";
 import Link from "next/link";
+import { getPreviewImages } from "@/lib/previews";
 
 export default function Home() {
-    const PREVIEW = [
-  "/media/forresterfields/cupcake1.jpg",
-  "/media/forresterfields/cupcake2.jpg",
-  "/media/forresterfields/cupcake3.jpg",
-  "/media/forresterfields/cupcake4.jpg",
-  "/media/forresterfields/FB_IMG_1760901027010.jpg",
-  "/media/forresterfields/ffieldslogotransparent.png",
-  "/media/forresterfields/momndad.jpg",
-  "/media/forresterfields/theforresters-0185.jpg"
-];
+    const PREVIEW = getPreviewImages();
 
   return (
     <main>
@@ -55,7 +47,7 @@ export default function Home() {
           {/* White card with white logo.jpg on white background */}
           <div className="justify-self-center w-full max-w-sm">
             <div className="bg-white rounded-2xl shadow-sm ring-1 ring-black/5 p-6 flex items-center justify-center">
-              <Image src="/media/forresterfields/logo.jpg" alt="Forrester Fields logo" width={224} height={224} className="w-56 h-auto object-contain" />
+              <Image src="/media/forresterfields/logo.png" alt="Forrester Fields logo" width={224} height={224} className="w-56 h-auto object-contain" />
             </div>
           </div>
         </div>
