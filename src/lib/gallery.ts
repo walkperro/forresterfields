@@ -8,7 +8,10 @@ const GALLERY_DIR = path.join(PUBLIC_DIR, "media", "forresterfields");
 const EXCLUDE = new Set(["momndad.jpg","momndad.jpeg","logo.jpg","logo.jpeg","logo.png"]);
 const IMAGE_EXT = new Set([".jpg",".jpeg",".png",".webp"]);
 
-export type GalleryImage = { src: string; alt: string };
+export type GalleryImage = { src: string; alt: string 
+  width?: number;
+  height?: number
+};
 
 export function getGalleryImages(): GalleryImage[] {
   const list: GalleryImage[] = [];
