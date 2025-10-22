@@ -10,47 +10,39 @@ type Props = {
   images: ImgLike[];
   startIndex: number;
   onClose: () => void;
-  onIndexChange: (nextIndex: number) => void; // accept a number (not a setter fn)
+  onIndexChange: (nextIndex: number) => void;
 };
 
-function toSrc(img: ImgLike) {
-  return typeof img === "string" ? img : img.src;
-}
-function toAlt(img: ImgLike, i: number) {
-  return typeof img === "string" ? `Forrester Fields photo ${i + 1}` : img.alt || `Forrester Fields photo ${i + 1}`;
-}
+const toSrc = (img: ImgLike) => (typeof img === "string" ? img : img.src);
+const toAlt = (img: ImgLike, i: number) =>
+  typeof img === "string" ? `Forrester Fields photo ${i + 1}` : img.alt || `Forrester Fields photo ${i + 1}`;
 
+/** Smooth but light crossfade (no slide) for max performance */
 const easeCubic: [number, number, number, number] = [0.22, 1, 0.36, 1];
-
-const fadeSlide: Variants = {
-  initial: { opacity: 0, x: 40 },
-  enter:   { opacity: 1, x: 0, transition: { duration: 0.32, ease: easeCubic } },
-  exit:    { opacity: 0, x: -40, transition: { duration: 0.26, ease: easeCubic } },
+const crossfade: Variants = {
+  initial: { opacity: 0 },
+  enter:   { opacity: 1, transition: { duration: 0.22, ease: easeCubic } },
+  exit:    { opacity: 0, transition: { duration: 0.18, ease: easeCubic } },
 } as const;
+
 export default function Lightbox({ images, startIndex, onClose, onIndexChange }: Props) {
   const [index, setIndex] = useState(startIndex);
 
-  // keyboard navigation (top-level effect)
+  // Keyboard controls
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
-      if (e.key === "ArrowLeft") {
-        const next = (index - 1 + images.length) % images.length;
-        setIndex(next);
-        onIndexChange(next);
-      }
-      if (e.key === "ArrowRight") {
-        const next = (index + 1) % images.length;
-        setIndex(next);
-        onIndexChange(next);
-      }
+      if (e.key === "ArrowLeft") goPrev();
+      if (e.key === "ArrowRight") goNext();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [index, images.length, onClose, onIndexChange]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [index]); // keep deps minimal for perf
 
-  // prefetch neighbors (top-level effect)
+  // Prefetch neighbors (browser only)
   useEffect(() => {
+    if (typeof window === "undefined") return;
     const left = (index - 1 + images.length) % images.length;
     const right = (index + 1) % images.length;
     [left, right].forEach((i) => {
@@ -58,7 +50,8 @@ export default function Lightbox({ images, startIndex, onClose, onIndexChange }:
       const img = new window.Image();
       img.src = s;
     });
-  }, [index, images]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [index]);
 
   const goPrev = () => {
     const next = (index - 1 + images.length) % images.length;
@@ -76,7 +69,7 @@ export default function Lightbox({ images, startIndex, onClose, onIndexChange }:
 
   return (
     <LazyMotion features={domAnimation}>
-      {/* single global dim background, no inner backdrop */}
+      {/* Single global dim background (like before) */}
       <div
         className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
         onClick={onClose}
@@ -88,7 +81,7 @@ export default function Lightbox({ images, startIndex, onClose, onIndexChange }:
             <AnimatePresence mode="wait" initial={false}>
               <m.div
                 key={src}
-                variants={fadeSlide}
+                variants={crossfade}
                 initial="initial"
                 animate="enter"
                 exit="exit"
