@@ -24,7 +24,7 @@ const container: Variants = {
   hidden: { opacity: 1 },
   show: {
     opacity: 1,
-    transition: { staggerChildren: 0.06, delayChildren: 0.02 },
+    transition: { staggerChildren: 0.10, delayChildren: 0.05 },
   },
 };
 
@@ -34,7 +34,7 @@ const item: Variants = {
     opacity: 1,
     y: 0,
     scale: 1,
-    transition: { duration: 0.35, ease: easeCubic },
+    transition: { duration: 0.55, ease: easeCubic },
   },
 };
 
@@ -75,7 +75,7 @@ export default function GalleryGrid({ images }: { images: GalleryImage[] }) {
                     onClick={() => { setIndex(i); setOpen(true); }}
                     className="group block w-full overflow-hidden rounded-2xl bg-white/40 ring-1 ring-black/5 hover:ring-brand-gold block"
                     aria-label={`Open photo ${i + 1}`}
-                    whileHover={{ scale: 1.01 }}
+                    whileHover={{ scale: 1.005 }}
                     transition={{ duration: 0.18 }}
                   >
                     <img src={src}
