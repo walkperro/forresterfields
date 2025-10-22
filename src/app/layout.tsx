@@ -26,7 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <head>
-        <link rel="preload" as="video" href="/media/forresterfields/hero.mp4" type="video/mp4" />
+        <link rel="preload" as="video" href="/media/forresterfields/hero_21s_streamcopy.mp4" type="video/mp4" />
       </head>
       <body className={`${display.variable} ${inter.variable} font-sans min-h-screen flex flex-col`}>
         <SeoJsonLd />

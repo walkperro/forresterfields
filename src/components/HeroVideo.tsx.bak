@@ -1,87 +1,46 @@
-'use client';
-
-import { useEffect, useRef, useState } from 'react';
+"use client";
+import Link from "next/link";
 
 export default function HeroVideo() {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const [fadeToBlack, setFadeToBlack] = useState(false);
-
-  useEffect(() => {
-    const v = videoRef.current;
-    if (!v) return;
-
-    // Fade out just before the loop ends, fade back in at the start.
-    const onTimeUpdate = () => {
-      if (!v.duration) return;
-      const remaining = v.duration - v.currentTime;
-      // Show black overlay for the last ~0.7s of each loop
-      setFadeToBlack(remaining <= 0.7);
-    };
-
-    v.addEventListener('timeupdate', onTimeUpdate);
-    return () => v.removeEventListener('timeupdate', onTimeUpdate);
-  }, []);
-
   return (
-    <section className="relative h-[70vh] md:h-[78vh] overflow-hidden">
-      <video
-        ref={videoRef}
-        className="absolute inset-0 h-full w-full object-contain [object-position:50%_35%] max-h-[70vh] mx-auto bg-black" 
-        // object-position nudges the focal point up a bit so faces stay in frame
-        src="/media/forresterfields/hero.mp4"
-        autoPlay
-        muted
-        playsInline
-        loop
-      />
+    <section className="relative bg-black">
+      {/* Video */}
+      <div className="mx-auto max-w-7xl">
+        <video
+          className="block w-full mx-auto object-contain max-h-[78vh] md:max-h-[82vh] transition-opacity duration-500"
+          autoPlay
+          muted
+          loop
+          playsInline
+          src="/media/forresterfields/hero_21s_streamcopy.mp4"
+        />
+      </div>
 
-      {/* Readability overlay */}
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/40 via-black/20 to-black/40" />
+      {/* Text overlay */}
+      <div className="absolute inset-0 flex flex-col justify-center px-6 md:px-12 text-left">
+        <div className="pointer-events-auto text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)] max-w-3xl translate-y-[2vh] md:translate-y-[3vh]">
+          <h1 className="font-['Playfair_Display'] text-[2rem] sm:text-[2.75rem] md:text-[3.25rem] leading-snug mb-3">
+            Unforgettable Lakeside Weddings
+          </h1>
 
-      {/* Soft vignette (edge fade) */}
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          WebkitMaskImage:
-            'radial-gradient(120% 80% at 50% 40%, #000 55%, transparent 100%)',
-          maskImage:
-            'radial-gradient(120% 80% at 50% 40%, #000 55%, transparent 100%)',
-        }}
-      />
+          <p className="text-[0.95rem] sm:text-[1.05rem] md:text-lg text-slate-100/90 mb-6 leading-relaxed max-w-xl">
+            Private venue in Loganville serving Walton County &amp; the Greater
+            Atlanta area — full planning, month-of, and day-of coordination.
+          </p>
 
-      {/* Loop crossfade to black, then back in */}
-      <div
-        className={`pointer-events-none absolute inset-0 bg-black transition-opacity duration-700 ${
-          fadeToBlack ? 'opacity-100' : 'opacity-0'
-        }`}
-      />
-
-      {/* Copy */}
-      <div className="relative z-10 mx-auto h-full max-w-5xl px-4">
-        <div className="flex h-full items-center">
-          <div className="text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]">
-            <h1 className="font-['Playfair_Display'] leading-tight text-4xl sm:text-5xl md:text-6xl">
-              Unforgettable<br />Lakeside Weddings
-            </h1>
-            <p className="mt-4 max-w-2xl text-base md:text-lg">
-              Private venue in Loganville serving Walton County &amp; the
-              Greater Atlanta area — full planning, month-of, and day-of
-              coordination.
-            </p>
-            <div className="mt-6 flex gap-4">
-              <a
-                href="/contact"
-                className="rounded-md bg-emerald-800 px-5 py-3 text-white hover:bg-emerald-700"
-              >
-                Schedule a Tour
-              </a>
-              <a
-                href="/services"
-                className="rounded-md px-5 py-3 text-white/95 ring-1 ring-white/70 hover:bg-white/10"
-              >
-                View Packages
-              </a>
-            </div>
+          <div className="flex flex-wrap gap-4">
+            <Link
+              href="/contact"
+              className="rounded-md bg-emerald-800 hover:bg-emerald-700 px-6 py-3 text-base font-medium text-white shadow-md hover:shadow-lg transition-all"
+            >
+              Schedule a Tour
+            </Link>
+            <Link
+              href="/services"
+              className="rounded-md border border-white/80 hover:bg-white/10 px-6 py-3 text-base font-medium text-white backdrop-blur-[1px] transition-all"
+            >
+              View Packages
+            </Link>
           </div>
         </div>
       </div>

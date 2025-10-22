@@ -57,10 +57,10 @@ export default function GalleryGrid({ images }: { images: GalleryImage[] }) {
           {/* 2–3 column masonry; smaller cards so ~3 rows show on load */}
           <m.div
             className="columns-2 md:columns-3 gap-3 [column-fill:_balance] block"
-             variants={container}
-            
-            
-            
+            variants={container}
+            initial="hidden"
+            whileInView="show"
+            viewport={{ once: false, amount: 0.2, margin: "0px 0px -10% 0px" }}
           >
             {filtered.map((img, i) => {
               const src = toSrc(img);
@@ -70,7 +70,7 @@ export default function GalleryGrid({ images }: { images: GalleryImage[] }) {
                   key={src + i}
                   variants={item}
                   className="inline-block align-top w-full mb-3 [break-inside:avoid] block"
-                 initial="hidden" whileInView="show" viewport={{ once:false, amount:0.2 }}>
+                >
                   <m.button
                     onClick={() => { setIndex(i); setOpen(true); }}
                     className="group block w-full overflow-hidden rounded-2xl bg-white/40 ring-1 ring-black/5 hover:ring-brand-gold block"
@@ -78,11 +78,16 @@ export default function GalleryGrid({ images }: { images: GalleryImage[] }) {
                     whileHover={{ scale: 1.01 }}
                     transition={{ duration: 0.18 }}
                   >
-                    <img src={src}
+                    <img
+                      src={src}
                       alt={alt}
                       width={900}
                       height={700}
-                      className="w-full h-auto object-cover transition-transform duration-300 group-hover:scale-[1.02] block" style={{display:"block",width:"100%",height:"auto"}} loading="lazy" decoding="async" /></m.button>
+                      className="w-full h-auto object-cover transition-transform duration-300 group-hover:scale-[1.02] block"
+                     
+                     
+                    />
+                  </m.button>
                 </m.div>
               );
             })}

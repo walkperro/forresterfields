@@ -7,12 +7,13 @@ export default function HeroVideo() {
       {/* Video */}
       <div className="mx-auto max-w-7xl">
         <video
-          className="block w-full mx-auto object-contain max-h-[78vh] md:max-h-[82vh] transition-opacity duration-500"
+          className="block w-full mx-auto object-contain max-h-[78vh] md:max-h-[82vh]"
           autoPlay
           muted
           loop
           playsInline
-          src="/media/forresterfields/hero.mp4"
+          preload="auto"
+          src="/media/forresterfields/hero_21s_streamcopy.mp4"
         />
       </div>
 
