@@ -1,3 +1,6 @@
+const fs = require('fs');
+const f = 'src/components/GalleryGrid.tsx';
+const code = `\
 "use client";
 
 import Image from "next/image";
@@ -13,8 +16,8 @@ function toSrc(img: GalleryImage) {
 }
 function toAlt(img: GalleryImage, i: number) {
   return typeof img === "string"
-    ? `Forrester Fields photo ${i + 1}`
-    : img.alt || `Forrester Fields photo ${i + 1}`;
+    ? \`Forrester Fields photo \${i + 1}\`
+    : img.alt || \`Forrester Fields photo \${i + 1}\`;
 }
 
 // Easing & variants (typed) for smooth scroll-in
@@ -74,7 +77,7 @@ export default function GalleryGrid({ images }: { images: GalleryImage[] }) {
                   <m.button
                     onClick={() => { setIndex(i); setOpen(true); }}
                     className="group block w-full overflow-hidden rounded-2xl bg-white/40 ring-1 ring-black/5 hover:ring-brand-gold"
-                    aria-label={`Open photo ${i + 1}`}
+                    aria-label={\`Open photo \${i + 1}\`}
                     whileHover={{ scale: 1.01 }}
                     transition={{ duration: 0.18 }}
                   >
@@ -106,3 +109,6 @@ export default function GalleryGrid({ images }: { images: GalleryImage[] }) {
     </LazyMotion>
   );
 }
+`;
+fs.writeFileSync(f, code, 'utf8');
+console.log('✅ Fixed: src/components/GalleryGrid.tsx (typed Variants + easing array).');

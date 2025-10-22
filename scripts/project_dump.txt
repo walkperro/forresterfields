@@ -1,0 +1,3744 @@
+----- FILE: src/app/admin/jobs/AdminJobsClient.tsx -----
+"use client";
+
+import { useState } from "react";
+
+export type JobRow = {
+  id: string;
+  created_at?: string | null;
+  title: string | null;
+  event_date: string | null;
+  location: string | null;
+  roles: string[];           // text[] in supabase (normalized in server)
+  pay: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  notes: string | null;
+  status: "open" | "closed";
+};
+
+type Props = { initialJobs: JobRow[] };
+
+export default function AdminJobsClient({ initialJobs }: Props) {
+  const [jobs, setJobs] = useState<JobRow[]>(
+    Array.isArray(initialJobs) ? initialJobs : []
+  );
+  const [busy, setBusy] = useState(false);
+
+  async function handleCreate(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (busy) return;
+    setBusy(true);
+
+    // 🔧 keep a stable reference to the form BEFORE any await calls
+    const form = e.currentTarget;
+
+    try {
+      const fd = new FormData(form);
+      const res = await fetch("/api/jobs/create", { method: "POST", body: fd });
+      const j = await res.json();
+      if (!res.ok || !j?.ok) throw new Error(j?.error || `Create failed (${res.status})`);
+
+      const newJob: JobRow = j.job;
+      setJobs((prev) => [newJob, ...prev]); // optimistic add
+      form.reset(); // safe now because we cached the node
+    } catch (err) {
+      alert((err as Error).message || "Create failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm("Delete this job?")) return;
+    const prev = jobs;
+    setJobs(prev.filter((j) => j.id !== id)); // optimistic
+    try {
+      const res = await fetch("/api/jobs/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok || !j?.ok) throw new Error(j?.error || `Delete failed (${res.status})`);
+    } catch (err) {
+      setJobs(prev); // rollback
+      alert((err as Error).message || "Delete failed");
+    }
+  }
+
+  async function handleStatus(id: string, status: JobRow["status"]) {
+    const prev = jobs;
+    setJobs(prev.map((j) => (j.id === id ? { ...j, status } : j)));
+    try {
+      const res = await fetch("/api/jobs/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, status }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok || !j?.ok) throw new Error(j?.error || `Update failed (${res.status})`);
+    } catch (err) {
+      setJobs(prev); // rollback
+      alert((err as Error).message || "Update failed");
+    }
+  }
+
+  return (
+    <div className="space-y-8">
+      {/* Create form */}
+      <form onSubmit={handleCreate} className="rounded-xl border p-4 space-y-3">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <input name="title" placeholder="Title" className="border rounded-lg px-3 py-2" />
+          <input name="event_date" type="date" className="border rounded-lg px-3 py-2" />
+          <input name="location" placeholder="Location" className="border rounded-lg px-3 py-2" />
+          <input name="roles" placeholder="Roles (comma separated)" className="border rounded-lg px-3 py-2" />
+          <input name="pay" placeholder="Pay (e.g., $20/hr)" className="border rounded-lg px-3 py-2" />
+          <input name="start_time" placeholder="Start time (e.g., 3:00 PM)" className="border rounded-lg px-3 py-2" />
+          <input name="end_time" placeholder="End time (e.g., 10:00 PM)" className="border rounded-lg px-3 py-2" />
+        </div>
+        <textarea name="notes" placeholder="Notes" className="w-full border rounded-lg px-3 py-2 min-h-24" />
+        <div className="flex items-center gap-3">
+          <select name="status" defaultValue="open" className="border rounded-lg px-3 py-2">
+            <option value="open">open</option>
+            <option value="closed">closed</option>
+          </select>
+          <button disabled={busy} className="rounded-lg border px-4 py-2 hover:bg-slate-50">
+            {busy ? "Creating..." : "Create job"}
+          </button>
+        </div>
+      </form>
+
+      {/* Table */}
+      <div className="overflow-x-auto rounded-xl border bg-white">
+        <table className="min-w-full text-sm">
+          <thead className="bg-gray-50 text-left">
+            <tr>
+              <th className="px-3 py-2">Title</th>
+              <th className="px-3 py-2">Date</th>
+              <th className="px-3 py-2">Location</th>
+              <th className="px-3 py-2">Roles</th>
+              <th className="px-3 py-2">Pay</th>
+              <th className="px-3 py-2">Time</th>
+              {/* Notes now always visible */}
+              <th className="px-3 py-2">Notes</th>
+              <th className="px-3 py-2">Status</th>
+              <th className="px-3 py-2">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {jobs.length === 0 && (
+              <tr>
+                <td className="px-3 py-4 text-gray-500" colSpan={9}>No jobs yet.</td>
+              </tr>
+            )}
+            {jobs.map((j) => {
+              const time = [j.start_time, j.end_time].filter(Boolean).join(" – ") || "—";
+              const roles = Array.isArray(j.roles) ? j.roles.join(", ") : "—";
+              return (
+                <tr key={j.id} className="border-t">
+                  <td className="px-3 py-2">{j.title ?? "—"}</td>
+                  <td className="px-3 py-2">{j.event_date ?? "—"}</td>
+                  <td className="px-3 py-2">{j.location ?? "—"}</td>
+                  <td className="px-3 py-2">{roles}</td>
+                  <td className="px-3 py-2">{j.pay ?? "—"}</td>
+                  <td className="px-3 py-2">{time}</td>
+                  <td className="px-3 py-2 max-w-[18rem]">
+                    <span className="line-clamp-2">{j.notes ?? "—"}</span>
+                  </td>
+                  <td className="px-3 py-2">
+                    <select
+                      value={j.status}
+                      onChange={(e) => handleStatus(j.id, e.target.value as JobRow["status"])}
+                      className="border rounded px-2 py-1"
+                    >
+                      <option value="open">open</option>
+                      <option value="closed">closed</option>
+                    </select>
+                  </td>
+                  <td className="px-3 py-2">
+                    <button
+                      onClick={() => handleDelete(j.id)}
+                      className="px-3 py-1 rounded-md border border-red-700 text-red-800 text-xs hover:bg-red-50"
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+
+----- FILE: src/app/admin/jobs/page.tsx -----
+import { supabase } from "@/lib/supabase";
+import AdminJobsClient from "./AdminJobsClient";
+import AdminNav from "@/components/AdminNav";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+type JobRow = {
+  id: string;
+  created_at: string | null;
+  title: string | null;
+  event_date: string | null;   // yyyy-mm-dd
+  location: string | null;
+  roles: string[];             // normalized to array here
+  pay: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  notes: string | null;
+  status: "open" | "closed";
+};
+
+// helpers to safely coerce unknown -> desired shapes
+function s(v: unknown): string | null {
+  const out = String(v ?? "").trim();
+  return out ? out : null;
+}
+
+function rolesToArray(v: unknown): string[] {
+  if (Array.isArray(v)) {
+    return v
+      .filter((x): x is string => typeof x === "string")
+      .map((x) => x.trim())
+      .filter(Boolean);
+  }
+  if (typeof v === "string") {
+    return v
+      .split(/,|\s+/)
+      .map((x) => x.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
+function statusFrom(v: unknown): "open" | "closed" {
+  const val = String(v ?? "").toLowerCase();
+  return val === "closed" ? "closed" : "open";
+}
+
+export default async function AdminJobsPage() {
+  const { data, error } = await supabase
+    .from("jobs")
+    .select("*")
+    .order("created_at", { ascending: false, nullsFirst: false })
+  .order("event_date", { ascending: true, nullsFirst: false });
+
+  const normalizedRows: JobRow[] = (data as unknown[] | null ?? []).map((raw) => {
+    const r = raw as Record<string, unknown>;
+    return {
+      id: String(r.id ?? ""),
+      created_at: s(r.created_at),
+      title: s(r.title),
+      event_date: s(r.event_date),
+      location: s(r.location),
+      roles: rolesToArray(r.roles),
+      pay: s(r.pay),
+      start_time: s(r.start_time),
+      end_time: s(r.end_time),
+      notes: s(r.notes),
+      status: statusFrom(r.status),
+    };
+  });
+
+  return (
+    <main className="max-w-5xl mx-auto px-4 py-10">
+      <h1 className="font-['Playfair_Display'] text-[2rem] font-light tracking-tight text-slate-800"><span className="block mb-6">Job Posts</span></h1>
+      <AdminNav active="jobs" />
+      <p className="mt-2 text-slate-600">Create and manage roles that appear on the Workers page.</p>
+
+      {error && (
+        <div className="mt-4 rounded-md border border-red-200 bg-red-50 p-3 text-red-700">
+          Failed to load jobs: {error.message}
+        </div>
+      )}
+
+      <div className="mt-8">
+        <AdminJobsClient initialJobs={normalizedRows} />
+      </div>
+    </main>
+  );
+}
+
+
+----- FILE: src/app/admin/page.tsx -----
+import Link from "next/link";
+
+export default function AdminIndex() {
+  return (
+    <main className="max-w-5xl mx-auto px-4 py-12">
+      <h1 className="font-['Playfair_Display'] text-[2rem] font-light tracking-tight text-slate-800 mb-6">Admin</h1>
+      <p className="mt-2 text-slate-600">Choose a section:</p>
+
+      <div className="mt-6 grid gap-4">
+        <Link href="/admin/requests" className="block rounded-xl border p-6 bg-white hover:bg-gray-50">
+          <div className="text-xl font-semibold">Planner Requests</div>
+          <div className="text-gray-600 mt-1">Review & track inbound planner requests.</div>
+        </Link>
+
+        <Link href="/admin/workers" className="block rounded-xl border p-6 bg-white hover:bg-gray-50">
+          <div className="text-xl font-semibold">Workers</div>
+          <div className="text-gray-600 mt-1">Review applications and manage status.</div>
+        </Link>
+
+        <Link href="/admin/jobs" className="block rounded-xl border p-6 bg-white hover:bg-gray-50">
+          <div className="text-xl font-semibold">Job Posts</div>
+          <div className="text-gray-600 mt-1">Create, open/close, and delete worker roles.</div>
+        </Link>
+      </div>
+    </main>
+  );
+}
+
+
+----- FILE: src/app/admin/requests/ClientTable.tsx -----
+"use client";
+
+import { useMemo, useState } from "react";
+import type { PlannerRequest } from "./types";
+
+type ClientProps = { initialRows: PlannerRequest[] };
+
+const STATUS_LABELS = {
+  new: "New",
+  contacted: "Contacted",
+  booked: "Booked",
+  archived: "Archived", // display label changed to Denied
+} as const;
+
+const STATUS_OPTIONS = Object.keys(STATUS_LABELS) as Array<keyof typeof STATUS_LABELS>;
+
+function rowClasses(status?: PlannerRequest["status"]) {
+  const s = (status ?? "new") as NonNullable<PlannerRequest["status"]>;
+  const base = "border-t transition-shadow";
+  if (s === "booked") return `${base} bg-green-50`;
+  if (s === "archived") return `${base} bg-red-50`;
+  if (s === "contacted") return `${base} bg-blue-50`;
+  return `${base} bg-yellow-50 ring-1 ring-yellow-300/70 shadow-[0_0_16px_rgba(234,179,8,0.25)]`;
+}
+
+export default function ClientTable({ initialRows }: ClientProps) {
+  const [q, setQ] = useState("");
+  const [status, setStatus] = useState<"all" | keyof typeof STATUS_LABELS>("all");
+  const [rows, setRows] = useState<PlannerRequest[]>(initialRows);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const filtered = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return rows.filter((r) => {
+      const okStatus = status === "all" ? true : (r.status || "new") === status;
+      if (!needle) return okStatus;
+      const hay =
+        [
+          r.planner_name,
+          r.email,
+          r.phone,
+          r.city_venue,
+          r.roles_needed,
+          r.event_date,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase() || "";
+      return okStatus && hay.includes(needle);
+    });
+  }, [rows, q, status]);
+
+  async function updateStatus(id: string, next: NonNullable<PlannerRequest["status"]>) {
+    try {
+      setBusyId(id);
+      const basic = btoa(`${process.env.NEXT_PUBLIC_BASIC_USER ?? ""}:${process.env.NEXT_PUBLIC_BASIC_PASS ?? ""}`);
+      const res = await fetch("/api/requests/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Basic ${basic}` },
+        body: JSON.stringify({ id, status: next }),
+      });
+      const json = (await res.json()) as { ok: boolean };
+      if (json.ok) setRows((prev) => prev.map((r) => (r.id === id ? { ...r, status: next } : r)));
+      else alert("Update failed");
+    } catch {
+      alert("Update failed");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function deleteRequest(id: string) {
+    if (!confirm("Warning: This cannot be undone. Permanently delete this planner request?")) return;
+    try {
+      setBusyId(id);
+      const res = await fetch("/api/requests/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j?.error || `Delete failed (${res.status})`);
+      }
+      setRows(prev => prev.filter(r => r.id !== id));
+    } catch (e) {
+      console.error((e as Error).message);
+      alert("Delete failed");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  function copy(text: string | null) {
+    if (!text) return;
+    navigator.clipboard.writeText(text).catch(() => {});
+  }
+
+  function handleFilterChange(e: React.ChangeEvent<HTMLSelectElement>): void {
+    const val = e.target.value as "all" | keyof typeof STATUS_LABELS;
+    setStatus(val);
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center">
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search name, email, phone, venue, roles…"
+          className="w-full md:w-96 rounded-md border px-3 py-2"
+        />
+        <select value={status} onChange={handleFilterChange} className="w-full md:w-48 rounded-md border px-3 py-2">
+          <option value="all">All statuses</option>
+          {STATUS_OPTIONS.map((s) => (
+            <option key={s} value={s}>
+              {STATUS_LABELS[s]}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="overflow-x-auto rounded-lg border">
+        <table className="min-w-full text-sm">
+          <thead className="bg-gray-50 text-left">
+            <tr>
+              <th className="px-3 py-2">Created</th>
+              <th className="px-3 py-2">Planner</th>
+              <th className="px-3 py-2">Email</th>
+              <th className="px-3 py-2">Phone</th>
+              <th className="px-3 py-2">Event</th>
+              <th className="px-3 py-2">City/Venue</th>
+              <th className="px-3 py-2">Roles</th>
+              <th className="px-3 py-2">Status</th>
+              <th className="px-3 py-2">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((r) => (
+              <tr key={r.id} className={rowClasses(r.status)}>
+                <td className="px-3 py-2 whitespace-nowrap">{new Date(r.created_at).toLocaleString()}</td>
+                <td className="px-3 py-2">{r.planner_name || "-"}</td>
+                <td className="px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <a href={r.email ? `mailto:${r.email}` : "#"} className="underline">
+                      {r.email || "-"}
+                    </a>
+                    {r.email && (
+                      <button onClick={() => copy(r.email)} className="rounded border px-2 py-0.5" title="Copy email">
+                        Copy
+                      </button>
+                    )}
+                  </div>
+                </td>
+                <td className="px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    {r.phone || "-"}
+                    {r.phone && (
+                      <button onClick={() => copy(r.phone)} className="rounded border px-2 py-0.5" title="Copy phone">
+                        Copy
+                      </button>
+                    )}
+                  </div>
+                </td>
+                <td className="px-3 py-2">{r.event_date || "-"}</td>
+                <td className="px-3 py-2">{r.city_venue || "-"}</td>
+                <td className="px-3 py-2">{r.roles_needed || "-"}</td>
+                <td className="px-3 py-2">
+                  <select
+                    disabled={busyId === r.id}
+                    value={(r.status || "new") as string}
+                    onChange={(e) => updateStatus(r.id, e.target.value as NonNullable<PlannerRequest["status"]>)}
+                    className="rounded border px-2 py-1"
+                  >
+                    {STATUS_OPTIONS.map((s) => (
+                      <option key={s} value={s}>
+                        {STATUS_LABELS[s]}
+                      </option>
+                    ))}
+                  </select>
+                </td>
+                <td className="px-3 py-2">
+                  <button
+                    disabled={busyId === r.id}
+                    onClick={() => deleteRequest(r.id)}
+                    className="px-3 py-1 rounded-md border border-red-700 text-red-800 text-xs hover:bg-red-50"
+                  >
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {filtered.length === 0 && (
+              <tr>
+                <td className="px-3 py-6 text-center text-gray-500" colSpan={9}>
+                  No results
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+
+----- FILE: src/app/admin/requests/page.tsx -----
+import "../admin.css";
+import CsvButton from "@/components/CsvButton";
+import "../admin-ui.css";
+import AdminNav from "@/components/AdminNav";
+import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
+import ClientTable from "./ClientTable";
+import type { PlannerRequest } from "./types";
+
+export const dynamic = "force-dynamic";
+
+async function getData(): Promise<PlannerRequest[]> {
+  const supabase = getSupabaseAdmin();
+  const { data } = await supabase
+    .from("planner_requests")
+    .select(
+      "id, created_at, planner_name, email, phone, event_date, city_venue, roles_needed, status"
+    )
+    .order("created_at", { ascending: false });
+  return (data ?? []) as PlannerRequest[];
+}
+
+export default async function Page() {
+  const rows = await getData();
+  return (
+    <div className="max-w-5xl mx-auto px-4 py-10">
+      <h1 className="font-['Playfair_Display'] text-[2rem] font-light tracking-tight text-slate-800"><span className="block mb-6">Planner Requests</span></h1>
+      <AdminNav active="requests" />
+
+      <div className="mb-4 flex items-center gap-3">
+        <CsvButton
+          rows={rows as unknown as Record<string, unknown>[]}
+          columns={[
+            { key: "created_at",  label: "Created" },
+            { key: "planner_name", label: "Planner" },
+            { key: "email",        label: "Email" },
+            { key: "phone",        label: "Phone" },
+            { key: "event_date",   label: "Event Date" },
+            { key: "city_venue",   label: "City/Venue" },
+            { key: "roles_needed", label: "Roles Needed" },
+            { key: "status",       label: "Status" }
+          ]}
+          filename={`planner-requests-${new Date().toISOString().slice(0,10)}.csv`}
+          label="Download CSV"
+        />
+      </div>
+
+      <div className="mt-6">
+        <ClientTable initialRows={rows} />
+      </div>
+    </div>
+  );
+}
+
+
+----- FILE: src/app/admin/requests/types.ts -----
+export type PlannerRequest = {
+  id: string;
+  created_at: string;
+  planner_name: string | null;
+  email: string | null;
+  phone: string | null;
+  event_date: string | null;
+  city_venue: string | null;
+  roles_needed: string | null;
+  status: "new" | "contacted" | "booked" | "archived" | null;
+};
+
+
+----- FILE: src/app/admin/workers/ClientWorkersTable.tsx -----
+"use client";
+
+import { useMemo, useState } from "react";
+import type React from "react";
+
+export type WorkerRow = {
+  id: string;
+  created_at: string;
+  name: string;
+  email: string;
+  phone: string;
+  availability: string;
+  roles: string;
+  references_text: string;
+  experience: string;
+  city: string;
+  age: string;
+  status: "new" | "contacted" | "booked" | "denied" | "available" | "unavailable";
+};
+
+const ALL_STATUSES = ["new","contacted","booked","denied","available","unavailable"] as const;
+type Status = WorkerRow["status"];
+
+function rowBg(status: Status) {
+  switch (status) {
+    case "booked":
+      return "bg-purple-50";
+    case "contacted":
+      return "bg-blue-50";
+    case "denied":
+      return "bg-rose-50";
+    case "available":
+      return "bg-green-50";
+    case "unavailable":
+      return "bg-gray-100";
+    default:
+      return "bg-yellow-50";
+  }
+}
+
+export default function ClientWorkersTable({ data }: { data: WorkerRow[] }) {
+  const [rows, setRows] = useState<WorkerRow[]>(useMemo(() => data, [data]));
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [q, setQ] = useState("");
+  const [status, setStatus] = useState<"all" | Status>("all");
+
+  const filtered = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return rows.filter((r) => {
+      const okStatus = status === "all" ? true : r.status === status;
+      if (!needle) return okStatus;
+      const hay = [
+        r.name, r.email, r.phone, r.city, r.roles, r.references_text, r.experience, r.availability,
+      ].join(" ").toLowerCase();
+      return okStatus && hay.includes(needle);
+    });
+  }, [rows, q, status]);
+
+  async function postUpdate(payload: {
+    id: string;
+    status?: Status;
+  }) {
+    const res = await fetch("/api/workers/update", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      throw new Error(j?.error || `Update failed (${res.status})`);
+    }
+  }
+
+  async function changeStatus(id: string, newStatus: Status) {
+    setBusyId(id);
+    const prev = rows;
+    try {
+      setRows((rs) => rs.map((r) => (r.id === id ? { ...r, status: newStatus } : r)));
+      await postUpdate({ id, status: newStatus });
+    } catch (e) {
+      setRows(prev);
+      alert("Failed to update status");
+      console.error((e as Error).message);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function deleteWorker(id: string) {
+    if (!confirm("Warning: This action cannot be undone. Permanently delete this applicant?")) return;
+    try {
+      setBusyId(id);
+      const res = await fetch("/api/workers/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j?.error || `Delete failed (${res.status})`);
+      }
+      setRows(prev => prev.filter(r => r.id !== id));
+    } catch (e) {
+      console.error((e as Error).message);
+      alert("Delete failed");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Controls */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search name, email, phone, city, roles..."
+          className="flex-1 border rounded-lg px-3 py-2"
+        />
+        <select
+          value={status}
+          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setStatus(e.target.value as Status)}
+          className="border rounded-lg px-3 py-2 w-full sm:w-56"
+        >
+          <option value="all">All statuses</option>
+          {ALL_STATUSES.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Table */}
+      <div className="rounded-xl border bg-white overflow-x-auto">
+        <table className="w-full text-sm min-w-[1100px]">
+          <thead className="bg-gray-50 text-gray-700">
+            <tr>
+              <th className="text-left px-4 py-3">Name</th>
+              <th className="text-left px-4 py-3">Email</th>
+              <th className="text-left px-4 py-3">Phone</th>
+              <th className="text-left px-4 py-3">City</th>
+              <th className="text-left px-4 py-3">Age</th>
+              <th className="text-left px-4 py-3">Availability</th>
+              <th className="text-left px-4 py-3">Roles</th>
+              <th className="text-left px-4 py-3">References</th>
+              <th className="text-left px-4 py-3">Experience</th>
+              <th className="text-left px-4 py-3">Status</th>
+              <th className="text-left px-4 py-3">Applied</th>
+              <th className="text-left px-4 py-3">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((r) => (
+              <tr key={r.id} className={`${rowBg(r.status)} border-t align-top`}>
+                <td className="px-4 py-3">{r.name || "—"}</td>
+                <td className="px-4 py-3">{r.email || "—"}</td>
+                <td className="px-4 py-3">{r.phone || "—"}</td>
+                <td className="px-4 py-3">{r.city || "—"}</td>
+                <td className="px-4 py-3">{r.age || "—"}</td>
+                <td className="px-4 py-3">{r.availability || "—"}</td>
+                <td className="px-4 py-3">{r.roles || "—"}</td>
+                <td className="px-4 py-3 whitespace-pre-wrap">{r.references_text || "—"}</td>
+                <td className="px-4 py-3 whitespace-pre-wrap">{r.experience || "—"}</td>
+                <td className="px-4 py-3">
+                  <select
+                    disabled={busyId === r.id}
+                    className="border rounded-md px-2 py-1 text-xs bg-white"
+                    value={r.status}
+                    onChange={(e) => changeStatus(r.id, e.target.value as Status)}
+                  >
+                    {ALL_STATUSES.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                </td>
+                <td className="px-4 py-3">
+                  {new Date(r.created_at).toLocaleString(undefined, {
+                    year: "numeric",
+                    month: "short",
+                    day: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </td>
+                <td className="px-4 py-3">
+                  <button
+                    disabled={busyId === r.id}
+                    className="px-3 py-1 rounded-md border border-red-700 text-red-800 text-xs hover:bg-red-50"
+                    onClick={() => deleteWorker(r.id)}
+                  >
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {filtered.length === 0 && (
+              <tr>
+                <td className="px-4 py-12 text-gray-500" colSpan={12}>
+                  No worker applications match your filters.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+
+----- FILE: src/app/admin/workers/page.tsx -----
+import "../admin.css";
+import CsvButton from "@/components/CsvButton";
+import "../admin-ui.css";
+import AdminNav from "@/components/AdminNav";
+import ClientWorkersTable, { WorkerRow } from "./ClientWorkersTable";
+import { createClient } from "@supabase/supabase-js";
+
+type WorkerDB = {
+  id: string;
+  created_at: string;
+  name?: string | null;
+  full_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  availability?: string | null;
+  roles?: string[] | null;
+  references_text?: string | null; // reserved-word safe
+  experience?: string | null;
+  city?: string | null;
+  age?: number | null;
+  status?: string | null; // may be legacy values like "archived"
+};
+
+function getAdmin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const key = process.env.SUPABASE_SERVICE_ROLE!;
+  return createClient(url, key, { auth: { persistSession: false } });
+}
+
+export const dynamic = "force-dynamic";
+
+async function getWorkers(): Promise<WorkerRow[]> {
+  const supabase = getAdmin();
+
+  const { data } = await supabase
+    .from("workers")
+    .select(
+      "id, created_at, name, full_name, email, phone, availability, roles, references_text, experience, city, age, status"
+    )
+    .order("created_at", { ascending: false });
+
+  const rows: WorkerDB[] = (data ?? []) as WorkerDB[];
+  return rows.map((r) => {
+    const displayName =
+      (r.full_name ?? r.name ?? "").trim() ||
+      [r.full_name, r.name].filter(Boolean).join(" ").trim();
+
+    const rolesJoined = Array.isArray(r.roles)
+      ? r.roles.join(", ")
+      : ((r.roles as unknown as string) ?? "");
+
+    // Accept the new set of statuses; remap legacy "archived" -> "denied"
+    const rawStatus = (r.status === "archived" ? "denied" : r.status) ?? "new";
+    const allowed = [
+      "new",
+      "contacted",
+      "booked",
+      "denied",
+      "available",
+      "unavailable",
+    ] as const;
+
+    const normalizedStatus: WorkerRow["status"] = (allowed as readonly string[]).includes(
+      rawStatus
+    )
+      ? (rawStatus as WorkerRow["status"])
+      : "new";
+
+    return {
+      id: r.id,
+      created_at: r.created_at,
+      name: displayName || "—",
+      email: r.email ?? "",
+      phone: r.phone ?? "",
+      availability: r.availability ?? "",
+      roles: rolesJoined,
+      references_text: r.references_text ?? "",
+      experience: r.experience ?? "",
+      city: r.city ?? "",
+      age: typeof r.age === "number" ? String(r.age) : ((r.age ?? "") as string),
+      status: normalizedStatus,
+    };
+  });
+}
+
+export default async function WorkersPage() {
+  const rows = await getWorkers();
+  return (
+    <div className="max-w-5xl mx-auto px-4 py-10">
+      <h1 className="font-['Playfair_Display'] text-[2rem] font-light tracking-tight text-slate-800 mb-6">Workers</h1>
+      <AdminNav active="workers" />
+
+      <div className="mb-4 flex items-center gap-3">
+        <CsvButton
+          rows={rows as unknown as Record<string, unknown>[]}
+          columns={[
+            { key: "created_at", label: "Created" },
+            { key: "name", label: "Name" },
+            { key: "email", label: "Email" },
+            { key: "phone", label: "Phone" },
+            { key: "city", label: "City" },
+            { key: "age", label: "Age" },
+            { key: "availability", label: "Availability" },
+            { key: "roles", label: "Roles" },
+            { key: "status", label: "Status" },
+          ]}
+          filename={`workers-\${new Date().toISOString().slice(0, 10)}.csv`}
+          label="Download CSV"
+        />
+      </div>
+
+      <div className="mt-6">
+        <ClientWorkersTable data={rows} />
+      </div>
+    </div>
+  );
+}
+
+
+----- FILE: src/app/api/apply/route.ts -----
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { NextResponse } from "next/server";
+import { supabase } from "@/lib/supabaseClient";
+
+function toArray(val: unknown): string[] | null {
+  if (!val) return null;
+  if (Array.isArray(val)) return val as string[];
+  if (typeof val === "string") {
+    return val.split(",").map(s => s.trim()).filter(Boolean);
+  }
+  return null;
+}
+
+export async function POST(req: Request) {
+  try {
+    // Accept both JSON and form submissions
+    let body: any;
+    const ctype = req.headers.get("content-type") || "";
+    if (ctype.includes("application/json")) {
+      body = await req.json();
+    } else {
+      const fd = await req.formData();
+      body = Object.fromEntries(fd as any);
+    }
+
+    // Honeypot — silently succeed for bots
+    if (body.company || body.website || body._hp) {
+      return NextResponse.json({ ok: true });
+    }
+
+    const name = (body.name ?? body.full_name ?? "").toString().trim();
+    const email = (body.email ?? "").toString().trim() || null;
+    const phone = (body.phone ?? "").toString().trim() || null;
+    const availability = (body.availability ?? "").toString().trim() || null;
+    const city = (body.city ?? "").toString().trim() || null;
+    const experience = (body.experience ?? "").toString().trim() || null;
+    const references = (body.references ?? body.refs ?? "").toString().trim() || null;
+    const roles = toArray(body.roles);
+
+    const { error } = await supabase.from("workers").insert({
+      name: name || null,
+      email,
+      phone,
+      availability,
+      city,
+      experience,
+      references,
+      roles,
+      status: "pending",
+      full_name: name || null,
+    });
+
+    if (error) {
+      console.error("supabase insert error", error);
+      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ ok: true });
+  } catch (err: any) {
+    const msg = err?.message ?? "Unknown error";
+    console.error("apply route error", err);
+    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
+  }
+}
+
+
+----- FILE: src/app/api/debug-jobs/route.ts -----
+import { NextResponse } from 'next/server';
+import { supabase } from '@/lib/supabase';
+
+export async function GET() {
+  const { data, error } = await supabase.from('jobs').select('*').order('event_date', { ascending: true });
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json(data ?? []);
+}
+
+
+----- FILE: src/app/api/debug/client/route.ts -----
+import { NextRequest, NextResponse } from "next/server";
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json().catch(() => ({}));
+    // Print to server logs (visible with `vercel logs`)
+    console.error("[CLIENT-ERROR]", JSON.stringify(body));
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
+  }
+}
+
+
+----- FILE: src/app/api/jobs/create/route.ts -----
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+
+type JobStatus = "open" | "closed";
+type JobInsert = {
+  title: string | null;
+  event_date: string | null;
+  location: string | null;
+  roles: string[];
+  pay: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  notes: string | null;
+  status?: JobStatus;
+};
+
+function admin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+  const key = process.env.SUPABASE_SERVICE_ROLE || "";
+  if (!url || !key) throw new Error("Supabase env missing");
+  return createClient(url, key, { auth: { persistSession: false } });
+}
+
+function s(v: unknown): string {
+  return typeof v === "string" ? v.trim() : String(v ?? "").trim();
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const supa = admin();
+
+    // Accept JSON or FormData
+    const ct = (req.headers.get("content-type") || "").toLowerCase();
+    let body: Record<string, unknown> = {};
+    if (ct.includes("application/json")) {
+      body = (await req.json()) as Record<string, unknown>;
+    } else {
+      const fd = await req.formData();
+      body = Object.fromEntries(fd.entries());
+    }
+
+    const rolesCsv = s(body.roles);
+    const roles = rolesCsv ? rolesCsv.split(",").map(r => r.trim()).filter(Boolean) : [];
+
+    const payload: JobInsert = {
+      title: s(body.title) || null,
+      event_date: s(body.event_date) || null,
+      location: s(body.location) || null,
+      roles,
+      pay: s(body.pay) || null,
+      start_time: s(body.start_time) || null,
+      end_time: s(body.end_time) || null,
+      notes: s(body.notes) || null,
+      status: ((): JobStatus => (s(body.status).toLowerCase() === "closed" ? "closed" : "open"))(),
+    };
+
+    if (!payload.title || !payload.event_date) {
+      return NextResponse.json({ ok: false, error: "Title and Date are required." }, { status: 400 });
+    }
+
+    const { data, error } = await supa
+      .from("jobs")
+      .insert(payload)
+      .select("id,title,event_date,location,roles,pay,start_time,end_time,notes,status,created_at")
+      .single();
+
+    if (error) {
+      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ ok: true, job: data });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
+  }
+}
+
+
+----- FILE: src/app/api/jobs/delete/route.ts -----
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+
+function admin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+  const key = process.env.SUPABASE_SERVICE_ROLE || "";
+  if (!url || !key) throw new Error("Supabase env vars missing");
+  return createClient(url, key, { auth: { persistSession: false } });
+}
+
+const s = (v: unknown) => String(v ?? "").trim();
+
+export async function POST(req: NextRequest) {
+  try {
+    const supa = admin();
+    const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+    const id = s(body.id);
+    if (!id) return NextResponse.json({ ok: false, error: "Missing id" }, { status: 400 });
+
+    const { error } = await supa.from("jobs").delete().eq("id", id).limit(1);
+    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
+  }
+}
+
+
+----- FILE: src/app/api/jobs/update/route.ts -----
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+
+type JobStatus = "open" | "closed";
+
+function admin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+  const key = process.env.SUPABASE_SERVICE_ROLE || "";
+  if (!url || !key) throw new Error("Supabase env vars missing");
+  return createClient(url, key, { auth: { persistSession: false } });
+}
+
+const s = (v: unknown) => String(v ?? "").trim();
+function normalizeDate(v: unknown): string | null {
+  const raw = s(v);
+  if (!raw) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  const m = raw.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+  if (m) {
+    const mm = m[1].padStart(2, "0");
+    const dd = m[2].padStart(2, "0");
+    const yyyy = m[3];
+    return `${yyyy}-${mm}-${dd}`;
+  }
+  const d = new Date(raw);
+  if (!isNaN(d.valueOf())) {
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  }
+  return null;
+}
+
+function parseRoles(v: unknown): string[] | undefined {
+  if (v === undefined) return undefined;
+  if (Array.isArray(v)) return v.map(s).filter(Boolean);
+  if (typeof v === "string") return v.split(",").map((x) => x.trim()).filter(Boolean);
+  return [];
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const supa = admin();
+    const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+    const id = s(body.id);
+    if (!id) return NextResponse.json({ ok: false, error: "Missing id" }, { status: 400 });
+
+    const patch: Record<string, unknown> = {};
+    if (body.title !== undefined) patch.title = s(body.title) || null;
+    if (body.status !== undefined) {
+      const val = s(body.status).toLowerCase();
+      patch.status = (val === "closed" ? "closed" : "open") as JobStatus;
+    }
+    if (body.event_date !== undefined) patch.event_date = normalizeDate(body.event_date);
+    if (body.location !== undefined) patch.location = s(body.location) || null;
+    const roles = parseRoles(body.roles);
+    if (roles !== undefined) patch.roles = roles;
+    if (body.pay !== undefined) patch.pay = s(body.pay) || null;
+    if (body.start_time !== undefined) patch.start_time = s(body.start_time) || null;
+    if (body.end_time !== undefined) patch.end_time = s(body.end_time) || null;
+    if (body.notes !== undefined) patch.notes = s(body.notes) || null;
+
+    if (Object.keys(patch).length === 0)
+      return NextResponse.json({ ok: false, error: "No fields to update" }, { status: 400 });
+
+    const { error } = await supa.from("jobs").update(patch).eq("id", id).limit(1);
+    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
+  }
+}
+
+
+----- FILE: src/app/api/planner-request/route.ts -----
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+import resend from "@/lib/resend";
+import { buildPlannerEmailHTML, buildPlannerEmailText } from "@/lib/mailer";
+
+function admin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const key = process.env.SUPABASE_SERVICE_ROLE!;
+  return createClient(url, key, { auth: { persistSession: false } });
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    // Accept FormData (from the planners page)
+    const fd = await req.formData();
+
+    const planner = String(fd.get("planner") ?? "").trim();
+    const email = String(fd.get("email") ?? "").trim();
+    const phone = String(fd.get("phone") ?? "").trim();
+    const event_date = String(fd.get("event_date") ?? "").trim(); // yyyy-mm-dd from <input type="date">
+    const city_venue = String(fd.get("venue") ?? "").trim();
+    const roles_needed = String(fd.get("roles_needed") ?? "").trim();
+    const notes = String(fd.get("notes") ?? "").trim();
+
+    if (!planner || !email) {
+      return NextResponse.json({ ok: false, error: "Missing required fields" }, { status: 400 });
+    }
+
+    const supa = admin();
+
+    // Insert into planner_requests
+    const { data, error } = await supa
+      .from("planner_requests")
+      .insert({
+        planner_name: planner,
+        email,
+        phone,
+        event_date,      // store as text/date column as your table expects
+        city_venue,
+        roles_needed,
+        notes,
+        status: "new",
+      })
+      .select("id")
+      .single();
+
+    if (error) {
+      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    }
+
+    // Email notification to you
+    const origin = req.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL || "https://forresterfields.vercel.app";
+    const html = buildPlannerEmailHTML({
+      planner,
+      email,
+      phone,
+      event_date,
+      city_venue,
+      roles_needed,
+      notes,
+      siteUrl: origin,
+    });
+    const text = buildPlannerEmailText({
+      planner,
+      email,
+      phone,
+      event_date,
+      city_venue,
+      roles_needed,
+      notes,
+      siteUrl: origin,
+    });
+
+    // Replace this with your real inbox
+    await resend.emails.send({
+      from: "Forrester Fields <noreply@forresterfields.com>",
+      to: [process.env.NOTIFY_TO_EMAIL || "you@example.com"],
+      subject: "New Planner Request",
+      html,
+      text,
+    });
+
+    return NextResponse.json({ ok: true, id: data.id });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
+  }
+}
+
+
+----- FILE: src/app/api/requests/auto-age/route.ts -----
+import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+
+function admin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const key = process.env.SUPABASE_SERVICE_ROLE!;
+  return createClient(url, key, { auth: { persistSession: false } });
+}
+
+// Age threshold: default 48h; override with env AGE_NEW_TO_CONTACTED_HOURS
+const AGE_HOURS = Number(process.env.AGE_NEW_TO_CONTACTED_HOURS ?? 48);
+
+export async function GET() {
+  try {
+    const supa = admin();
+    const cutoff = new Date(Date.now() - AGE_HOURS * 60 * 60 * 1000).toISOString();
+
+    // status is null or 'new' AND created_at older than cutoff -> set to 'contacted'
+    const { data, error } = await supa
+      .from("planner_requests")
+      .update({ status: "contacted" })
+      .lte("created_at", cutoff)
+      .or("status.is.null,status.eq.new")
+      .select(); // return updated rows so we can count them
+
+    if (error) throw error;
+
+    const updated = data?.length ?? 0;
+    return NextResponse.json({ ok: true, updated, cutoff, hours: AGE_HOURS });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
+  }
+}
+
+
+----- FILE: src/app/api/requests/delete/route.ts -----
+import { NextRequest, NextResponse } from "next/server";
+import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
+
+export async function POST(req: NextRequest) {
+  try {
+    const { id } = (await req.json().catch(() => ({}))) as { id?: string };
+    const safeId = String(id ?? "").trim();
+    if (!safeId) {
+      return NextResponse.json({ ok: false, error: "Missing id" }, { status: 400 });
+    }
+
+    const supabase = getSupabaseAdmin();
+    const { error } = await supabase.from("planner_requests").delete().eq("id", safeId);
+
+    if (error) {
+      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    }
+    return NextResponse.json({ ok: true });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
+  }
+}
+
+
+----- FILE: src/app/api/requests/export/route.ts -----
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { NextResponse } from "next/server";
+import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
+
+export async function GET() {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("planner_requests")
+    .select("created_at,planner_name,email,phone,event_date,city_venue,roles_needed,status,id")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  const rows = data ?? [];
+  const header = ["created_at","planner_name","email","phone","event_date","city_venue","roles_needed","status","id"];
+  const csv = [
+    header.join(","),
+    ...rows.map(r => header.map(k => {
+      const v = (r as any)[k] ?? "";
+      const s = String(v).replace(/"/g,'""');
+      return /[",\n]/.test(s) ? `"${s}"` : s;
+    }).join(","))
+  ].join("\n");
+
+  return new NextResponse(csv, {
+    headers: {
+      "Content-Type": "text/csv",
+      "Content-Disposition": `attachment; filename="planner_requests.csv"`,
+    },
+  });
+}
+
+
+----- FILE: src/app/api/requests/update/route.ts -----
+import { NextRequest, NextResponse } from "next/server";
+import { Buffer } from "buffer";
+import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
+
+const ALLOWED = ["new","contacted","booked","archived"] as const;
+type Status = (typeof ALLOWED)[number];
+
+function checkAuth(req: NextRequest): boolean {
+  const auth = req.headers.get("authorization") || "";
+  if (!auth.startsWith("Basic ")) return false;
+  const decoded = Buffer.from(auth.slice(6), "base64").toString("utf8");
+  const [user, pass] = decoded.split(":");
+  return (
+    user === (process.env.ADMIN_USER || "") &&
+    pass === (process.env.ADMIN_PASS || "")
+  );
+}
+
+export async function POST(req: NextRequest) {
+  if (!checkAuth(req)) {
+    return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  }
+
+  const body = (await req.json()) as { id?: string; status?: Status };
+  const id = body.id ?? "";
+  const status = body.status ?? "new";
+
+  if (!id || !ALLOWED.includes(status)) {
+    return NextResponse.json(
+      { ok: false, error: "invalid id or status" },
+      { status: 400 }
+    );
+  }
+
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("planner_requests")
+    .update({ status })
+    .eq("id", id)
+    .select("id, status")
+    .maybeSingle();
+
+  if (error) {
+    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true, data });
+}
+
+
+----- FILE: src/app/api/workers/apply/route.ts -----
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { sendWorkerApplicationEmail } from "@/lib/email";
+import { NextRequest, NextResponse } from "next/server";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+
+function normalize(v: unknown): string {
+  return String(v ?? "").trim();
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+    const key = process.env.SUPABASE_SERVICE_ROLE || "";
+    if (!url || !key) {
+      return NextResponse.json(
+        { error: "Supabase environment variables are missing." },
+        { status: 500 }
+      );
+    }
+
+    const supabase = createSupabaseClient(url, key, { auth: { persistSession: false } });
+
+    const ct = (req.headers.get("content-type") || "").toLowerCase();
+    let raw: Record<string, unknown> = {};
+
+    if (ct.includes("application/json")) {
+      raw = (await req.json()) as Record<string, unknown>;
+    } else if (
+      ct.includes("multipart/form-data") ||
+      ct.includes("application/x-www-form-urlencoded")
+    ) {
+      const fd = await req.formData();
+      raw = Object.fromEntries(fd.entries());
+    }
+
+    const rolesRaw = raw.roles;
+    let roles: string[] = [];
+
+    if (Array.isArray(rolesRaw)) {
+      roles = rolesRaw.map((v) => normalize(v)).filter(Boolean);
+    } else if (typeof rolesRaw === "string") {
+      // Handle comma- or space-separated roles
+      roles = rolesRaw
+        .split(/,|\s+/)
+        .map((r) => normalize(r))
+        .filter(Boolean);
+    }
+
+    const payload = {
+      name: normalize(raw.name),
+      email: normalize(raw.email),
+      phone: normalize(raw.phone),
+      city: normalize(raw.city),
+      age: normalize(raw.age),
+      availability: normalize(raw.availability),
+      roles,
+      references_text: normalize(raw.references_text ?? raw.references),
+      experience: normalize(raw.experience),
+    };
+
+    if (!payload.name && !payload.email) {
+      return NextResponse.json({ error: "Name and Email are required." }, { status: 400 });
+    }
+
+    const { error } = await supabase.from("workers").insert([
+      {
+        name: payload.name,
+        email: payload.email,
+        phone: payload.phone,
+        city: payload.city,
+        age: payload.age,
+        availability: payload.availability,
+        roles: payload.roles, // text[] column expects array
+        references_text: payload.references_text,
+        experience: payload.experience,
+        status: "new",
+      },
+    ]);
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    try {
+      const to = process.env.NOTIFY_TO_EMAIL || "forresterfieldsweddings@gmail.com";
+      // "payload" should be your object with name/email/etc.
+      await sendWorkerApplicationEmail(to, payload as any);
+    } catch (err) { console.warn("[email] notify failed", err); }
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Unknown error";
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+}
+
+
+----- FILE: src/app/api/workers/delete/route.ts -----
+import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+
+function admin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const key = process.env.SUPABASE_SERVICE_ROLE!;
+  return createClient(url, key, { auth: { persistSession: false } });
+}
+
+export async function POST(req: Request) {
+  try {
+    const { id } = (await req.json()) as { id?: string };
+    if (!id) {
+      return NextResponse.json({ ok: false, error: "missing id" }, { status: 400 });
+    }
+    const supa = admin();
+    const { error } = await supa.from("workers").delete().eq("id", id);
+    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
+  }
+}
+
+
+----- FILE: src/app/api/workers/update/route.ts -----
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+
+// Canonical statuses we accept/store now
+const CANONICAL = ["new","contacted","booked","denied","available","unavailable"] as const;
+type Status = typeof CANONICAL[number];
+
+// Also accept legacy "archived" and map -> "denied"
+const LEGACY = ["archived"] as const;
+
+function admin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+  const key = process.env.SUPABASE_SERVICE_ROLE || "";
+  if (!url || !key) throw new Error("Supabase admin env vars missing");
+  return createClient(url, key, { auth: { persistSession: false } });
+}
+
+function normalizeStatus(s: unknown): Status | null {
+  const v = String(s ?? "").trim().toLowerCase();
+  if ((CANONICAL as readonly string[]).includes(v)) return v as Status;
+  if ((LEGACY as readonly string[]).includes(v)) return "denied"; // archived -> denied
+  return null;
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const supa = admin();
+    const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+
+    const id = String(body.id ?? "").trim();
+    if (!id) return NextResponse.json({ ok: false, error: "Missing id" }, { status: 400 });
+
+    // Support either `status` or legacy `decision: accept|deny`
+    const decision = String(body.decision ?? "").trim().toLowerCase();
+    let status = normalizeStatus(body.status);
+    if (!status && (decision === "accept" || decision === "deny")) {
+      status = decision === "accept" ? "booked" : "denied";
+    }
+    if (!status) {
+      return NextResponse.json({ ok: false, error: "Invalid or missing status" }, { status: 400 });
+    }
+
+    const { data, error } = await supa
+      .from("workers")
+      .update({ status })
+      .eq("id", id)
+      .select("id,status")
+      .maybeSingle();
+
+    if (error)   return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    if (!data)   return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
+
+    return NextResponse.json({ ok: true, data });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
+  }
+}
+
+
+----- FILE: src/app/contact/ClientContactForm.tsx -----
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+
+export default function ClientContactForm() {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (busy) return;
+
+    const fd = new FormData(e.currentTarget);
+    const name = String(fd.get("name") || "").trim();
+    const email = String(fd.get("email") || "").trim();
+    const phone = String(fd.get("phone") || "").trim();
+    const event_date = String(fd.get("event_date") || "").trim();
+    const guestCount = String(fd.get("guestCount") || "").trim();
+    const message = String(fd.get("message") || "").trim();
+
+    if (!name || !email) {
+      setErr("Please enter your name and email.");
+      return;
+    }
+
+    // We’ll use planner_requests. Pack guest count + message into roles_needed free text.
+    const payload = {
+      planner_name: name,
+      email,
+      phone,
+      event_date: event_date || null,
+      city_venue: null,
+      roles_needed: [
+        guestCount ? `Guests: ${guestCount}` : null,
+        message ? `Notes: ${message}` : null,
+      ].filter(Boolean).join(" — "),
+      status: "new",
+    };
+
+    setBusy(true);
+    setErr(null);
+    try {
+      const res = await fetch("/api/planner-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok || !j?.ok) {
+        throw new Error(j?.error || `Submit failed (${res.status})`);
+      }
+      router.push("/thanks");
+    } catch (error) {
+      setErr((error as Error).message || "Something went wrong. Please try again.");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      {err && (
+        <div className="mt-4 rounded-md border border-red-200 bg-red-50 p-3 text-red-700">
+          {err}
+        </div>
+      )}
+
+      <form onSubmit={onSubmit} className="mt-8 grid gap-4 max-w-xl">
+        <input className="border p-3 rounded-md" name="name" placeholder="Your name" required />
+        <input className="border p-3 rounded-md" name="email" type="email" placeholder="Email" required />
+        <input className="border p-3 rounded-md" name="phone" placeholder="Phone" />
+        <input className="border p-3 rounded-md" name="event_date" placeholder="Event date" />
+        <input className="border p-3 rounded-md" name="guestCount" placeholder="Guest count" />
+        <textarea className="border p-3 rounded-md" name="message" rows={5} placeholder="Tell us about your event"></textarea>
+        <button className="btn btn-primary" disabled={busy}>{busy ? "Sending..." : "Send"}</button>
+      </form>
+    </>
+  );
+}
+
+
+----- FILE: src/app/contact/page.tsx -----
+export default function Contact() {
+  return (
+    <main className="container py-12">
+      <h1 className="font-display text-4xl">Schedule a Tour / Check Your Date</h1>
+      <p className="text-gray-600 mt-2">We’ll reply quickly with availability and next steps.</p>
+      <form action="https://formsubmit.co/hello@forresterfields.com" method="POST" className="mt-8 grid gap-4 max-w-xl">
+    <input type="hidden" name="_next" value="https://forresterfields.vercel.app/thanks" />
+        <input type="hidden" name="_subject" value="New Inquiry from ForresterFields.com" />
+        <input type="hidden" name="_captcha" value="false" />
+        <input className="border p-3 rounded-md" name="name" placeholder="Your name" required />
+        <input className="border p-3 rounded-md" name="email" type="email" placeholder="Email" required />
+        <input className="border p-3 rounded-md" name="phone" placeholder="Phone" />
+        <input className="border p-3 rounded-md" name="date" placeholder="Event date" />
+        <input className="border p-3 rounded-md" name="guestCount" placeholder="Guest count" />
+        <textarea className="border p-3 rounded-md" name="message" rows={5} placeholder="Tell us about your event"></textarea>
+        <button className="btn btn-primary">Send</button>
+      </form>
+    </main>
+  );
+}
+
+
+----- FILE: src/app/event-pool/ApplyFormClient.tsx -----
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useState, FormEvent } from "react";
+
+const ROLES = [
+  "Setup","Cleanup","Decorating","Greeting guests","Parking",
+  "Passing drinks & apps","Serving food","Bartending",
+  "Bathroom attendant","Driver",
+];
+
+export default function ApplyFormClient() {
+  const router = useRouter();
+  const [status, setStatus] = useState<"idle"|"loading"|"error">("idle");
+  const [err, setErr] = useState<string | null>(null);
+
+  async function onSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setStatus("loading");
+    setErr(null);
+
+    const fd = new FormData(e.currentTarget);
+    const roles = fd.getAll("roles").map(String);
+
+    const payload = {
+      name: String(fd.get("name") || "").trim(),
+      email: String(fd.get("email") || "").trim(),
+      phone: String(fd.get("phone") || "").trim(),
+      city: String(fd.get("city") || "").trim(),
+      age: String(fd.get("age") || "").trim(),
+      availability: String(fd.get("availability") || "").trim(),
+      references_text: String(fd.get("references_text") || "").trim(),
+      experience: String(fd.get("experience") || "").trim(),
+      roles,
+    };
+
+    try {
+      const res = await fetch("/api/workers/apply", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j?.error || `Request failed (${res.status})`);
+      }
+
+      router.push("/event-pool/thanks");
+    } catch (e) {
+      setStatus("error");
+      setErr(e instanceof Error ? e.message : "Something went wrong.");
+    }
+  }
+
+  return (
+    <div className="mt-6">
+      {status === "error" && (
+        <div className="bg-red-100 border border-red-300 text-red-800 px-4 py-3 rounded-lg mb-4">
+          {err || "There was a problem submitting your application."}
+        </div>
+      )}
+
+      <form onSubmit={onSubmit} className="space-y-4">
+        <input name="name" required placeholder="Full name" className="w-full border rounded-lg px-3 py-2" />
+        <input name="email" type="email" required placeholder="Email" className="w-full border rounded-lg px-3 py-2" />
+        <input name="phone" placeholder="Phone" className="w-full border rounded-lg px-3 py-2" />
+        <input name="city" placeholder="City" className="w-full border rounded-lg px-3 py-2" />
+        <input name="age" placeholder="Age" className="w-full border rounded-lg px-3 py-2" />
+
+        <div>
+          <p className="font-medium mb-2">Roles you can do</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {ROLES.map((r) => (
+              <label key={r} className="flex items-center gap-2">
+                <input type="checkbox" name="roles" value={r} />
+                <span>{r}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <textarea name="availability" placeholder="Availability" className="w-full border rounded-lg px-3 py-2 min-h-[64px]" />
+        <textarea name="references_text" placeholder="References" className="w-full border rounded-lg px-3 py-2 min-h-[64px]" />
+        <textarea name="experience" placeholder="Experience" className="w-full border rounded-lg px-3 py-2 min-h-[64px]" />
+
+        <button
+          type="submit"
+          disabled={status === "loading"}
+          className="w-full rounded-md bg-emerald-700 text-white px-4 py-2 disabled:opacity-50"
+        >
+          {status === "loading" ? "Submitting..." : "Submit"}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+
+----- FILE: src/app/event-pool/PlannerRequestFormClient.tsx -----
+"use client";
+
+import { useState, FormEvent } from "react";
+import { useRouter } from "next/navigation";
+
+export default function PlannerRequestFormClient() {
+  const router = useRouter();
+  const [status, setStatus] = useState<"idle"|"loading"|"error"|"ok">("idle");
+  const [err, setErr] = useState<string | null>(null);
+
+  async function onSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setStatus("loading");
+    setErr(null);
+
+    const form = e.currentTarget;
+    const fd = new FormData(form);
+
+    try {
+      const res = await fetch("/api/planner-request", {
+        method: "POST",
+        body: fd,
+      });
+
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j?.error || `Request failed (${res.status})`);
+      }
+
+      setStatus("ok");
+      router.push("/thanks");
+    } catch (e) {
+      setStatus("error");
+      setErr(e instanceof Error ? e.message : "Something went wrong.");
+    }
+  }
+
+  return (
+    <div className="rounded-xl border bg-white p-6">
+      {status === "error" && (
+        <div className="mb-4 border border-red-300 bg-red-100 text-red-800 rounded-md px-3 py-2">
+          {err || "There was a problem submitting your request."}
+        </div>
+      )}
+
+      <form onSubmit={onSubmit} className="grid gap-4">
+        {/* honeypot */}
+        <input type="text" name="_gotcha" className="hidden" tabIndex={-1} autoComplete="off" />
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-1">
+            <label className="text-sm font-medium">Planner name</label>
+            <input name="planner" required placeholder="Your name" className="border rounded-md px-3 py-2" />
+          </div>
+
+          <div className="grid gap-1">
+            <label className="text-sm font-medium">Email</label>
+            <input name="email" type="email" required placeholder="name@email.com" className="border rounded-md px-3 py-2" />
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-1">
+            <label className="text-sm font-medium">Phone</label>
+            <input name="phone" placeholder="(###) ###-####" className="border rounded-md px-3 py-2" />
+          </div>
+
+          <div className="grid gap-1">
+            <label className="text-sm font-medium">Date of wedding</label>
+            <input name="event_date" type="date" className="border rounded-md px-3 py-2" />
+          </div>
+        </div>
+
+        <div className="grid gap-1">
+          <label className="text-sm font-medium">City / Venue</label>
+          <input name="venue" placeholder="City or venue name" className="border rounded-md px-3 py-2" />
+        </div>
+
+        <div className="grid gap-1">
+          <label className="text-sm font-medium">Roles needed</label>
+          <input name="roles_needed" placeholder="e.g., Setup, Serving, Bartending" className="border rounded-md px-3 py-2" />
+        </div>
+
+        <div className="grid gap-1">
+          <label className="text-sm font-medium">Brief description</label>
+          <textarea name="notes" rows={5} placeholder="Tell us about your event (timeline, headcount, special needs, etc.)" className="border rounded-md px-3 py-2" />
+        </div>
+
+        <div className="pt-1">
+          <button type="submit" disabled={status === "loading"} className="btn btn-primary">
+            {status === "loading" ? "Submitting..." : "Send request"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+
+----- FILE: src/app/event-pool/page.tsx -----
+import Link from "next/link";
+import { Playfair_Display } from "next/font/google";
+
+const playfair = Playfair_Display({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-playfair",
+});
+
+export default function EventPoolIndex() {
+  return (
+    <main className="max-w-4xl mx-auto px-4 py-12">
+      {/* Elegant title font */}
+      <h1 className={`${playfair.className} text-4xl font-medium leading-snug text-slate-800`}>
+        The Event Pool by Forrester Fields
+      </h1>
+
+      {/* Intro paragraphs */}
+      <div className="mt-6 space-y-4 text-[1rem] leading-7 text-slate-700">
+        <p className="font-semibold text-slate-900">
+          Are you a dependable worker looking to earn extra money on weekends you choose?
+          <br />Or a special events planner scrambling for dependable workers?
+        </p>
+
+        <p>
+          This is the place for you. Let’s help each other in the special events community of Walton County
+          and Greater Atlanta area.
+        </p>
+
+        <p>
+          As a special events planner, my job is to handle the behind-the-scenes hustle and make sure the big day
+          goes off without a hitch. A successful event hinges on the reliability and efficiency of a cohesive team.
+          I look for hard-working, dependable, ethical workers with strong references, communication, and transportation.
+        </p>
+
+        <p>
+          Even when you secure the best workers well in advance, life happens. To make sure that never leaves an event
+          short-staffed, I created a vetted pool of event professionals. If a worker becomes unavailable, they simply
+          contact me directly so I can match a qualified replacement from the pool. This ensures every event stays fully
+          staffed, smooth, and stress-free for planners and clients alike.
+        </p>
+
+        <p>
+          If you’re looking to work special events in Walton County and Greater Atlanta area, apply below. If you’re a
+          planner who’d like access to dependable workers, send us your request.
+        </p>
+
+        <p className="italic text-slate-800">— Marisol Forrester</p>
+      </div>
+
+      {/* Roles list */}
+      <h2 className="mt-10 text-xl font-semibold text-slate-900">Typical Roles</h2>
+      <ul className="mt-3 list-disc pl-6 space-y-1 text-[1rem] leading-7 text-slate-700">
+        <li>Set-up / Clean-up</li>
+        <li>Decorating</li>
+        <li>Greeting guests</li>
+        <li>Parking</li>
+        <li>Passing drinks &amp; apps</li>
+        <li>Serving food</li>
+        <li>Bartending</li>
+        <li>Bathroom attendants</li>
+        <li>Driver (bride &amp; groom departure)</li>
+      </ul>
+
+      {/* Navigation cards */}
+      <div className="mt-10 grid gap-4 sm:grid-cols-2">
+        <Link href="/event-pool/workers" className="block rounded-xl border p-6 hover:bg-gray-50">
+          <div className="text-lg font-semibold">For Workers</div>
+          <div className="text-gray-600 mt-1 text-sm">See open roles and apply to join the pool.</div>
+        </Link>
+
+        <Link href="/event-pool/planners" className="block rounded-xl border p-6 hover:bg-gray-50">
+          <div className="text-lg font-semibold">For Planners</div>
+          <div className="text-gray-600 mt-1 text-sm">Request staff for your upcoming event.</div>
+        </Link>
+      </div>
+    </main>
+  );
+}
+
+
+----- FILE: src/app/event-pool/planners/page.tsx -----
+import { Playfair_Display } from "next/font/google";
+import PlannerRequestFormClient from "../PlannerRequestFormClient";
+
+const playfair = Playfair_Display({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-playfair",
+});
+
+export const dynamic = "force-dynamic";
+
+export default function PlannersPage() {
+  return (
+    <main className="max-w-5xl mx-auto px-4 py-12">
+      <h1 className={`${playfair.className} text-4xl font-medium leading-snug text-slate-800`}>
+        Planners
+      </h1>
+      <p className="mt-2 text-slate-600">
+        Need staff for an upcoming event? Send us the details and we’ll get back to you quickly.
+      </p>
+
+      <div className="mt-6">
+        <PlannerRequestFormClient />
+      </div>
+    </main>
+  );
+}
+
+
+----- FILE: src/app/event-pool/thanks/page.tsx -----
+import Link from "next/link";
+
+export const metadata = { title: "Application received" };
+
+export default function ThanksPage() {
+  return (
+    <div className="max-w-3xl mx-auto px-4 py-16">
+      <div className="rounded-xl border bg-white p-8">
+        <h1 className="font-display text-2xl mb-3">Thank you for your application!</h1>
+        <p className="text-gray-700">
+          You’ll hear from us as soon as possible. If there’s a fit, we’ll reach out with next steps.
+        </p>
+        <div className="mt-8">
+          <Link href="/" className="inline-block rounded-md border px-4 py-2 hover:bg-gray-50">← Back to Home</Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+----- FILE: src/app/event-pool/workers/page.tsx -----
+import { Playfair_Display } from "next/font/google";
+import { supabase } from "@/lib/supabase";
+import ApplyFormClient from "../ApplyFormClient";
+
+const playfair = Playfair_Display({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-playfair",
+});
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+// Narrow type for jobs returned by Supabase
+type JobRow = {
+  id: string;
+  title?: string | null;
+  status?: string | null;
+  event_date?: string | null;
+  location?: string | null;
+  roles?: string[] | string | null;
+  pay?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+  notes?: string | null;
+};
+
+export default async function WorkersPage() {
+  const { data: jobs, error } = await supabase
+    .from("jobs")
+    .select("*")
+  .eq("status", "open")
+    .order("created_at", { ascending: false, nullsFirst: false })
+  .order("event_date", { ascending: true, nullsFirst: false });
+
+  const rows = (jobs ?? []) as JobRow[];
+
+  return (
+    <main className="max-w-5xl mx-auto px-4 py-12">
+      <h1 className={`${playfair.className} text-4xl font-medium leading-snug text-slate-800`}>
+        Workers
+      </h1>
+      <p className="mt-2 text-slate-600">Browse open roles and apply to join our pool.</p>
+
+      <h2 className="mt-8 text-2xl font-semibold">Current Open Roles</h2>
+
+      {error && (
+        <div className="mt-4 rounded-md border border-red-200 bg-red-50 p-3 text-red-700">
+          Failed to load jobs: {error.message}
+        </div>
+      )}
+
+      <div className="mt-6 grid gap-6 sm:grid-cols-2">
+        {rows.length > 0 ? (
+          rows.map((job) => {
+            const rolesText = Array.isArray(job.roles)
+              ? job.roles.join(", ")
+              : (job.roles ?? "—");
+            const timeText =
+              [job.start_time, job.end_time].filter(Boolean).join(" – ") || "—";
+            return (
+              <article key={job.id} className="rounded-xl border border-slate-200 p-5 shadow-sm bg-white">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-slate-900">{job.title ?? "Event role"}</h3>
+                  <span className="text-sm px-2 py-1 rounded-full border border-slate-200">
+                    {job.status ?? "Open"}
+                  </span>
+                </div>
+                <dl className="mt-3 space-y-1 text-sm text-slate-700">
+                  <div className="flex gap-2">
+                    <dt className="w-28 font-medium">Date</dt>
+                    <dd>{job.event_date ?? "TBD"}</dd>
+                  </div>
+                  <div className="flex gap-2">
+                    <dt className="w-28 font-medium">Location</dt>
+                    <dd>{job.location ?? "TBD"}</dd>
+                  </div>
+                  <div className="flex gap-2">
+                    <dt className="w-28 font-medium">Roles</dt>
+                    <dd>{rolesText}</dd>
+                  </div>
+                  <div className="flex gap-2">
+                    <dt className="w-28 font-medium">Pay</dt>
+                    <dd>{job.pay ?? "—"}</dd>
+                  </div>
+                  <div className="flex gap-2">
+                    <dt className="w-28 font-medium">Time</dt>
+                    <dd>{timeText}</dd>
+                  </div>
+                </dl>
+                {job.notes && <p className="mt-3 text-sm text-slate-600">{job.notes}</p>}
+                <a
+                  href="#apply"
+                  className="mt-4 inline-flex items-center rounded-lg border px-3 py-2 text-sm hover:bg-slate-50"
+                >
+                  Request to work
+                </a>
+              </article>
+            );
+          })
+        ) : (
+          <p className="text-slate-600">No open roles yet. Check back soon!</p>
+        )}
+      </div>
+
+      <h2 id="apply" className="mt-14 text-2xl font-semibold">
+        Apply to Join the Pool
+      </h2>
+      <div className="mt-6">
+        <ApplyFormClient />
+      </div>
+    </main>
+  );
+}
+
+
+----- FILE: src/app/gallery/page.tsx -----
+import { GALLERY_FILES } from "@/lib/gallery";
+import GalleryGrid from "@/components/GalleryGrid";
+
+export const metadata = {
+  title: "Gallery | Forrester Fields",
+  description: "A peek at recent weddings at Forrester Fields.",
+};
+
+export default async function GalleryPage() {
+  const images = GALLERY_FILES;
+  return (
+    <main className="pb-16">
+      <section className="mx-auto max-w-6xl px-4 py-10">
+        <h1 className="font-serif text-4xl font-semibold tracking-tight">Gallery</h1>
+        <p className="mt-3 text-lg text-neutral-600">
+          A peek at recent weddings at Forrester Fields.
+        </p>
+      </section>
+      <GalleryGrid images={images}/>
+    </main>
+  );
+}
+
+
+----- FILE: src/app/layout.tsx -----
+import ClientErrorForwarder from "@/components/ClientErrorForwarder";
+import "./globals.css";
+import type { Metadata } from "next";
+import { Playfair_Display, Inter } from "next/font/google";
+import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
+import SeoJsonLd from "@/components/SeoJsonLd";
+
+const display = Playfair_Display({ subsets:["latin"], variable:"--ff-display" });
+const inter = Inter({ subsets:["latin"], variable:"--ff-sans" });
+export const metadata: Metadata = {
+  title: "Forrester Fields – Lakeside Weddings in Loganville, GA",
+  description: "Serene lakeside venue serving Walton County & Greater Atlanta with full planning, month-of, and day-of coordination.",
+  openGraph: {
+    title: "Forrester Fields – Lakeside Weddings in Loganville, GA",
+    description: "Serene lakeside venue serving Walton County & Greater Atlanta with full planning, month-of, and day-of coordination.",
+    images: ["/og.jpg"],
+  },
+  twitter: {
+    card: "summary_large_image",
+    images: ["/og.jpg"],
+  },
+  icons: { icon: "/favicon.svg" },
+};
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en">
+      <head>
+        <link rel="preload" as="video" href="/media/forresterfields/hero.mp4" type="video/mp4" />
+      </head>
+      <body className={`${display.variable} ${inter.variable} font-sans min-h-screen flex flex-col`}>
+        <SeoJsonLd />
+        <Navbar />
+        <div className="flex-1">{children}</div>
+        <Footer />
+        {process.env.NEXT_PUBLIC_DEBUG_CLIENT === "1" ? <ClientErrorForwarder /> : null}
+      </body>
+      </html>
+  );
+}
+
+
+----- FILE: src/app/page.tsx -----
+import HeroVideo from "@/components/HeroVideo";
+import Image from "next/image";
+import Link from "next/link";
+import { getPreviewImages } from "@/lib/previews";
+
+export default function Home() {
+    const PREVIEW = getPreviewImages();
+
+  return (
+    <main>
+      {/* HERO */}
+      <HeroVideo />
+
+      {/* VALUE PROPS */}
+      <section className="section">
+        <div className="container grid gap-6 md:grid-cols-3">
+          {[
+            ["Lakeside Ceremony", "Say “I do” beside the water under market lights."],
+            ["Planning to Day-Of", "From full planning to month-of and day-of coordination."],
+            ["Stress-free Logistics", "Parking, dressing suites, decor, lighting, and more."]
+          ].map(([t, d]) => (
+            <div key={t as string} className="card p-6">
+              <h3 className="text-xl font-semibold">{t}</h3>
+              <p className="text-gray-600 mt-2">{d}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      
+      {/* ABOUT FORRESTER FIELDS */}
+      <section className="section">
+        <div className="container grid gap-8 md:grid-cols-[1.2fr_1fr] items-center">
+          <div>
+            <h2 className="font-display text-3xl md:text-4xl">About Forrester Fields</h2>
+            <p className="text-gray-600 mt-4 leading-relaxed">
+              Forrester Fields is a serene, private lakeside venue in Loganville, GA — serving Walton County
+              and the Greater Atlanta area. From full planning to month-of and day-of coordination, our team
+              makes weddings effortless, beautiful, and deeply personal.
+            </p>
+            <p className="text-gray-600 mt-3 leading-relaxed">
+              You’ll find market lights by the water, thoughtful spaces for getting ready, and a warm,
+              dedicated staff focused on a smooth, stress-free day.
+            </p>
+          </div>
+
+          {/* White card with white logo.jpg on white background */}
+          <div className="justify-self-center w-full max-w-sm">
+            <div className="bg-white rounded-2xl shadow-sm ring-1 ring-black/5 p-6 flex items-center justify-center">
+              <Image src="/media/forresterfields/logo.png" alt="Forrester Fields logo" width={224} height={224} className="w-56 h-auto object-contain" />
+            </div>
+          </div>
+        </div>
+      </section>
+
+{/* GALLERY PREVIEW */}
+      <section className="section bg-brand-cream/50">
+        <div className="container">
+          <h2 className="font-display text-3xl">Gallery</h2>
+          <p className="text-gray-600 mt-2">A peek at recent weddings at Forrester Fields.</p>
+          <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-3">
+            {PREVIEW.map((f,i)=>(
+              <Image key={i} src={f} alt={`Wedding ${i+1}`} width={900} height={700}
+                className="h-40 w-full object-cover rounded-md" />
+            ))}
+          </div>
+          <div className="mt-6">
+            <Link href="/gallery" className="underline">See full gallery →</Link>
+          </div>
+        </div>
+      </section>
+
+      {/* CTA */}
+      <section className="section">
+        <div className="container card p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div>
+            <h3 className="text-2xl font-display">Check your date & plan a tour</h3>
+            <p className="text-gray-600 mt-1">Serving Walton County and the surrounding Greater Atlanta area.</p>
+          </div>
+          <Link href="/contact" className="btn btn-primary">Get in touch</Link>
+        </div>
+      </section>
+    
+      {/* ABOUT: MARISOL */}
+      <section className="section bg-white">
+        <div className="container text-center">
+          <div className="relative mx-auto w-72 h-72 sm:w-80 sm:h-80 md:w-96 md:h-96 mb-8">
+            <Image
+              src="/media/forresterfields/momndad.jpg"
+              alt="Marisol and her husband at the beach at sunset"
+              fill
+              priority
+              className="rounded-full object-cover"
+            />
+          </div>
+
+          <h2 className="font-display text-3xl md:text-4xl mb-4">
+            About Me, Your Wedding Planner!
+          </h2>
+
+          <div className="mx-auto max-w-3xl text-gray-700 leading-relaxed">
+            <p>
+              I am blessed to get to do what I love with the support of a wonderful
+              husband of 31 years. We have attended, been a part of and hosted many
+              celebrations and weddings over the years. It&apos;s a dream come true to
+              get to share my ideas and love for weddings and parties with others.
+            </p>
+
+            <p className="font-semibold mt-4">I was made for this!</p>
+
+            {/* subtle divider */}
+            <div className="mx-auto my-6 h-px w-24 bg-gray-200 rounded-full" />
+
+            <figure className="mt-4">
+              <blockquote className="italic text-gray-800 bg-gray-50 border border-gray-200 rounded-2xl p-6">
+                “Do not forget to show hospitality to strangers, for by so doing some
+                people have shown hospitality to angels without knowing it.”
+                <footer className="mt-3 text-gray-600 not-italic text-sm">
+                  Hebrews 13:2
+                </footer>
+              </blockquote>
+            </figure>
+          </div>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+
+----- FILE: src/app/services/page.tsx -----
+import ServicesAndPackages from "@/components/ServicesAndPackages";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+export default function ServicesPage() {
+  return (
+    <main className="container py-12">
+      <h1 className="font-display text-4xl">Services & Packages</h1>
+      <p className="text-gray-600 mt-2">Transparent options for stress-free planning.</p>
+
+      <ServicesAndPackages />
+    </main>
+  );
+}
+
+
+----- FILE: src/app/thanks/page.tsx -----
+import Link from "next/link";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+export default function ThanksPage() {
+  return (
+    <div className="max-w-3xl mx-auto px-4 py-16 text-center">
+      <h1 className="font-display text-3xl sm:text-4xl mb-4">
+        Thank you for your application.
+      </h1>
+      <p className="text-gray-700 mb-8">
+        You will hear from us as soon as possible!
+      </p>
+      <Link
+        href="/"
+        className="inline-block rounded-md border px-4 py-2 hover:bg-gray-50"
+      >
+        ← Back to Home
+      </Link>
+    </div>
+  );
+}
+
+
+----- FILE: src/app/venue/page.tsx -----
+import Image from "next/image";
+
+export const metadata = {
+  title: "Venue & Amenities – Forrester Fields",
+  description:
+    "Lakeside ceremony site, market-light reception, dressing suites, golf cart shuttle, and flexible packages in Loganville, GA.",
+};
+
+export default function Venue() {
+  const features = [
+    ["Lakeside Ceremony", "Waterfront vows with cedar cross and pre-hung string lights."],
+    ["Market-Light Reception", "Ambient lighting and power for DJ/band."],
+    ["Dressing Suites", "Separate quarters for bridal party and groomsmen."],
+    ["Parking & Shuttle", "On-site parking plus golf cart & driver for guest shuttle."],
+    ["Tables & Chairs", "Available inventory included with packages."],
+    ["Setup & Cleanup", "Add our team for stress-free turnaround."],
+  ];
+
+  return (
+    <main className="container py-12">
+      <h1 className="font-display text-4xl">The Venue</h1>
+      <p className="text-gray-600 mt-2">
+        A private lakeside property in Loganville serving Walton County and the Greater Atlanta area.
+      </p>
+
+      <div className="grid gap-6 md:grid-cols-2 mt-8">
+        <Image
+          src="/hero/hero.jpg"
+          alt="Forrester Fields lakeside venue"
+          width={1600} height={1100}
+          className="w-full h-72 object-cover rounded-xl"
+        />
+        <div className="card p-6">
+          <h2 className="text-xl font-semibold">Amenities</h2>
+          <ul className="mt-3 space-y-2">
+            {features.map(([t,d]) => (
+              <li key={String(t)} className="flex gap-3">
+                <span className="mt-1 h-2 w-2 bg-brand-green rounded-full"></span>
+                <div>
+                  <div className="font-medium">{t}</div>
+                  <div className="text-gray-600">{d}</div>
+                </div>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-6">
+            <a href="/services" className="btn btn-outline">View Packages</a>
+          </div>
+        </div>
+      </div>
+
+      <h2 className="text-2xl font-semibold mt-12">Find Us</h2>
+      <p className="text-gray-600">Loganville, GA • easy access from Monroe, Snellville, and East Atlanta.</p>
+      <div className="mt-4 rounded-xl overflow-hidden border" style={{height: "380px"}}>
+        <iframe
+          title="Google Map"
+          width="100%" height="100%" loading="lazy"
+          referrerPolicy="no-referrer-when-downgrade"
+          src="https://www.google.com/maps?q=Loganville,+GA&hl=en&z=12&output=embed">
+        </iframe>
+      </div>
+    </main>
+  );
+}
+
+
+----- FILE: src/components/AdminNav.tsx -----
+
+"use client";
+import Link from "next/link";
+
+type Tab = "home" | "requests" | "workers" | "jobs";
+
+export default function AdminNav({ active }: { active?: Tab }) {
+  const base = "border rounded-md px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-0";
+  const activeCls = "bg-slate-100 border-slate-300 text-slate-900";
+  const idleCls = "border-slate-300";
+
+  const Item = ({ href, label, tab }: { href: string; label: string; tab: Tab }) => (
+    <Link
+      href={href}
+      aria-current={active === tab ? "page" : undefined}
+      className={[base, active === tab ? activeCls : idleCls].join(" ")}
+    >
+      {label}
+    </Link>
+  );
+
+  return (
+    <div className="admin-nav flex flex-wrap gap-2 mt-4 mb-8">
+      <Item href="/admin" label="Admin Home" tab="home" />
+      <Item href="/admin/requests" label="Planner Requests" tab="requests" />
+      <Item href="/admin/workers" label="Workers" tab="workers" />
+      <Item href="/admin/jobs" label="Job Posts" tab="jobs" />
+    </div>
+  );
+}
+
+
+----- FILE: src/components/ApprovedWorkers.tsx -----
+"use client";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabaseClient";
+
+type AppRow = {
+  id: string;
+  created_at: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  city: string | null;
+  roles: string[] | null;
+  status: string;
+};
+
+export default function ApprovedWorkers() {
+  const [rows, setRows] = useState<AppRow[]>([]);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase
+      .from("applications")
+      .select("id,created_at,name,email,phone,city,roles,status")
+      .eq("status", "approved")
+      .order("created_at", { ascending: false })
+      .then(({ data, error }) =>
+        error ? setErr(error.message) : setRows(data || [])
+      );
+  }, []);
+
+  if (err) return <p className="text-red-600">Failed to load: {err}</p>;
+  if (!rows.length) return <p>No approved workers yet.</p>;
+
+  return (
+    <div className="mt-6 overflow-x-auto">
+      <table className="min-w-full text-sm">
+        <thead>
+          <tr className="text-left border-b">
+            <th className="py-2 pr-4">Name</th>
+            <th className="py-2 pr-4">Roles</th>
+            <th className="py-2 pr-4">City</th>
+            <th className="py-2 pr-4">Contact</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.id} className="border-b last:border-0">
+              <td className="py-2 pr-4">{r.name}</td>
+              <td className="py-2 pr-4">{(r.roles || []).join(", ")}</td>
+              <td className="py-2 pr-4">{r.city || ""}</td>
+              <td className="py-2 pr-4">
+                {r.email && (
+                  <a className="underline mr-2" href={`mailto:${r.email}`}>
+                    {r.email}
+                  </a>
+                )}
+                {r.phone && (
+                  <a className="underline" href={`tel:${r.phone}`}>
+                    {r.phone}
+                  </a>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="text-xs text-gray-500 mt-2">
+        Only “approved” entries are visible publicly (managed in Supabase).
+      </p>
+    </div>
+  );
+}
+
+
+----- FILE: src/components/ClientErrorForwarder.tsx -----
+"use client";
+
+import { useEffect } from "react";
+
+export default function ClientErrorForwarder() {
+  useEffect(() => {
+    const postJSON = (body: unknown) => {
+      try {
+        const json = JSON.stringify(body);
+        // Prefer sendBeacon (non-blocking); fall back to fetch
+        if (!(navigator.sendBeacon && navigator.sendBeacon("/api/client-error", new Blob([json], { type: "application/json" })))) {
+          void fetch("/api/client-error", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: json,
+          });
+        }
+      } catch {
+        // swallow
+      }
+    };
+
+    const onError = (event: ErrorEvent) => {
+      const payload = {
+        kind: "error" as const,
+        message: event.message || "Unknown error",
+        filename: event.filename,
+        lineno: event.lineno,
+        colno: event.colno,
+        stack: (event.error instanceof Error ? event.error.stack : null) ?? null,
+        userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
+      };
+      postJSON(payload);
+    };
+
+    const onRejection = (event: PromiseRejectionEvent) => {
+      const reason = event.reason;
+      const isErr = reason instanceof Error;
+      const payload = {
+        kind: "unhandledrejection" as const,
+        message: isErr ? reason.message : String(reason),
+        stack: isErr ? reason.stack ?? null : null,
+        userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
+      };
+      postJSON(payload);
+    };
+
+    window.addEventListener("error", onError);
+    window.addEventListener("unhandledrejection", onRejection);
+    return () => {
+      window.removeEventListener("error", onError);
+      window.removeEventListener("unhandledrejection", onRejection);
+    };
+  }, []);
+
+  return null;
+}
+
+
+----- FILE: src/components/CsvButton.tsx -----
+"use client";
+
+type Col = { key: string; label: string };
+
+function downloadCSV(rows: Record<string, unknown>[], cols: Col[], filename: string) {
+  const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const header = cols.map(c => esc(c.label)).join(",");
+  const body = rows.map(r => cols.map(c => esc((r as Record<string, unknown>)[c.key])).join(",")).join("\n");
+  const csv = header + "\n" + body;
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+export default function CsvButton(props: {
+  rows: Record<string, unknown>[];
+  columns: Col[];
+  filename: string;
+  className?: string;
+  label?: string;
+}) {
+  const { rows, columns, filename, className = "rounded-md border px-3 py-2 text-sm hover:bg-gray-50", label = "Download CSV" } = props;
+  return (
+    <button
+      type="button"
+      className={className}
+      onClick={() => downloadCSV(rows, columns, filename)}
+    >
+      {label}
+    </button>
+  );
+}
+
+
+----- FILE: src/components/FadeInOnView.tsx -----
+"use client";
+import { useEffect, useRef, useState } from "react";
+import { LazyMotion, domAnimation, m } from "framer-motion";
+
+export default function FadeInOnView({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisible(true);
+          obs.disconnect();
+        }
+      },
+      { rootMargin: "0px 0px -10% 0px", threshold: 0.15 }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
+  return (
+    <LazyMotion features={domAnimation}>
+      <m.div
+        ref={ref}
+        initial={{ opacity: 0, y: 18, scale: 0.995 }}
+        animate={visible ? { opacity: 1, y: 0, scale: 1 } : { opacity: 0, y: 18, scale: 0.995 }}
+        transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1], delay }}
+      >
+        {children}
+      </m.div>
+    </LazyMotion>
+  );
+}
+
+
+----- FILE: src/components/Footer.tsx -----
+export default function Footer(){
+  return (
+    <footer className="mt-16 border-t">
+      <div className="container py-10 text-sm text-gray-600">
+        <div>© {new Date().getFullYear()} Forrester Fields • Loganville, GA</div>
+        <div className="mt-2">Lakeside Weddings & Special Events</div>
+      </div>
+    </footer>
+  );
+}
+
+
+----- FILE: src/components/GalleryGrid.tsx -----
+"use client";
+
+import Image from "next/image";
+import { useState } from "react";
+import { m, LazyMotion, domAnimation } from "framer-motion";
+import type { Variants } from "framer-motion";
+import Lightbox from "./Lightbox";
+
+export type GalleryImage = string | { src: string; alt?: string };
+
+function toSrc(img: GalleryImage) {
+  return typeof img === "string" ? img : img.src;
+}
+function toAlt(img: GalleryImage, i: number) {
+  return typeof img === "string"
+    ? `Forrester Fields photo ${i + 1}`
+    : img.alt || `Forrester Fields photo ${i + 1}`;
+}
+
+// Easing & variants (typed) for smooth scroll-in
+const easeCubic: [number, number, number, number] = [0.22, 1, 0.36, 1];
+
+const container: Variants = {
+  hidden: { opacity: 1 },
+  show: {
+    opacity: 1,
+    transition: { staggerChildren: 0.06, delayChildren: 0.02 },
+  },
+};
+
+const item: Variants = {
+  hidden: { opacity: 0, y: 14, scale: 0.995 },
+  show: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: { duration: 0.35, ease: easeCubic },
+  },
+};
+
+export default function GalleryGrid({ images }: { images: GalleryImage[] }) {
+  const [open, setOpen] = useState(false);
+  const [index, setIndex] = useState(0);
+
+  // Exclude any file whose basename contains "mainbridge" or starts with "logo"
+  const filtered = images.filter((img) => {
+    const base = toSrc(img).split("/").pop()?.toLowerCase() || "";
+    if (base.includes("mainbridge")) return false;
+    if (base.startsWith("logo")) return false;
+    return true;
+  });
+
+  return (
+    <LazyMotion features={domAnimation}>
+      <>
+        <section className="mx-auto max-w-6xl px-4 pb-16">
+          {/* 2–3 column masonry; smaller cards so ~3 rows show on load */}
+          <m.div
+            className="columns-2 md:columns-3 gap-3 [column-fill:_balance]"
+            variants={container}
+            initial="hidden"
+            whileInView="show"
+            viewport={{ once: false, amount: 0.2, margin: "0px 0px -10% 0px" }}
+          >
+            {filtered.map((img, i) => {
+              const src = toSrc(img);
+              const alt = toAlt(img, i);
+              return (
+                <m.div
+                  key={src + i}
+                  variants={item}
+                  className="inline-block align-top w-full mb-3 [break-inside:avoid]"
+                >
+                  <m.button
+                    onClick={() => { setIndex(i); setOpen(true); }}
+                    className="group block w-full overflow-hidden rounded-2xl bg-white/40 ring-1 ring-black/5 hover:ring-brand-gold"
+                    aria-label={`Open photo ${i + 1}`}
+                    whileHover={{ scale: 1.01 }}
+                    transition={{ duration: 0.18 }}
+                  >
+                    <Image
+                      src={src}
+                      alt={alt}
+                      width={900}
+                      height={700}
+                      className="w-full h-auto object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                      sizes="(max-width:640px) 100vw, (max-width:1024px) 50vw, 33vw"
+                      priority={i < 2}
+                    />
+                  </m.button>
+                </m.div>
+              );
+            })}
+          </m.div>
+        </section>
+
+        {open && (
+          <Lightbox
+            images={filtered}
+            startIndex={index}
+            onClose={() => setOpen(false)}
+            onIndexChange={setIndex}
+          />
+        )}
+      </>
+    </LazyMotion>
+  );
+}
+
+
+----- FILE: src/components/HeroVideo.tsx -----
+"use client";
+import Link from "next/link";
+
+export default function HeroVideo() {
+  return (
+    <section className="relative bg-black">
+      {/* Video */}
+      <div className="mx-auto max-w-7xl">
+        <video
+          className="block w-full mx-auto object-contain max-h-[78vh] md:max-h-[82vh] transition-opacity duration-500"
+          autoPlay
+          muted
+          loop
+          playsInline
+          src="/media/forresterfields/hero.mp4"
+        />
+      </div>
+
+      {/* Text overlay */}
+      <div className="absolute inset-0 flex flex-col justify-center px-6 md:px-12 text-left">
+        <div className="pointer-events-auto text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)] max-w-3xl translate-y-[2vh] md:translate-y-[3vh]">
+          <h1 className="font-['Playfair_Display'] text-[2rem] sm:text-[2.75rem] md:text-[3.25rem] leading-snug mb-3">
+            Unforgettable Lakeside Weddings
+          </h1>
+
+          <p className="text-[0.95rem] sm:text-[1.05rem] md:text-lg text-slate-100/90 mb-6 leading-relaxed max-w-xl">
+            Private venue in Loganville serving Walton County &amp; the Greater
+            Atlanta area — full planning, month-of, and day-of coordination.
+          </p>
+
+          <div className="flex flex-wrap gap-4">
+            <Link
+              href="/contact"
+              className="rounded-md bg-emerald-800 hover:bg-emerald-700 px-6 py-3 text-base font-medium text-white shadow-md hover:shadow-lg transition-all"
+            >
+              Schedule a Tour
+            </Link>
+            <Link
+              href="/services"
+              className="rounded-md border border-white/80 hover:bg-white/10 px-6 py-3 text-base font-medium text-white backdrop-blur-[1px] transition-all"
+            >
+              View Packages
+            </Link>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+
+----- FILE: src/components/Lightbox.tsx -----
+"use client";
+
+import Image from "next/image";
+import { useEffect, useState } from "react";
+import { LazyMotion, domAnimation, m, AnimatePresence } from "framer-motion";
+import type { Variants } from "framer-motion";
+
+type ImgLike = string | { src: string; alt?: string };
+type Props = {
+  images: ImgLike[];
+  startIndex: number;
+  onClose: () => void;
+  onIndexChange: (nextIndex: number) => void;
+};
+
+const toSrc = (img: ImgLike) => (typeof img === "string" ? img : img.src);
+const toAlt = (img: ImgLike, i: number) =>
+  typeof img === "string" ? `Forrester Fields photo ${i + 1}` : img.alt || `Forrester Fields photo ${i + 1}`;
+
+/** Smooth but light crossfade (no slide) for max performance */
+const easeCubic: [number, number, number, number] = [0.22, 1, 0.36, 1];
+const crossfade: Variants = {
+  initial: { opacity: 0 },
+  enter:   { opacity: 1, transition: { duration: 0.22, ease: easeCubic } },
+  exit:    { opacity: 0, transition: { duration: 0.18, ease: easeCubic } },
+} as const;
+
+export default function Lightbox({ images, startIndex, onClose, onIndexChange }: Props) {
+  const [index, setIndex] = useState(startIndex);
+
+  // Keyboard controls
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      if (e.key === "ArrowLeft") goPrev();
+      if (e.key === "ArrowRight") goNext();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [index]); // keep deps minimal for perf
+
+  // Prefetch neighbors (browser only)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const left = (index - 1 + images.length) % images.length;
+    const right = (index + 1) % images.length;
+    [left, right].forEach((i) => {
+      const s = toSrc(images[i]);
+      const img = new window.Image();
+      img.src = s;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [index]);
+
+  const goPrev = () => {
+    const next = (index - 1 + images.length) % images.length;
+    setIndex(next);
+    onIndexChange(next);
+  };
+  const goNext = () => {
+    const next = (index + 1) % images.length;
+    setIndex(next);
+    onIndexChange(next);
+  };
+
+  const src = toSrc(images[index]);
+  const alt = toAlt(images[index], index);
+
+  return (
+    <LazyMotion features={domAnimation}>
+      {/* Single global dim background (like before) */}
+      <div
+        className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+        onClick={onClose}
+        role="dialog"
+        aria-modal="true"
+      >
+        <div className="relative w-full max-w-6xl" onClick={(e) => e.stopPropagation()}>
+          <div className="relative w-full h-[70vh] md:h-[80vh]">
+            <AnimatePresence mode="wait" initial={false}>
+              <m.div
+                key={src}
+                variants={crossfade}
+                initial="initial"
+                animate="enter"
+                exit="exit"
+                className="absolute inset-0"
+              >
+                <Image
+                  src={src}
+                  alt={alt}
+                  fill
+                  sizes="100vw"
+                  className="object-contain select-none"
+                  priority
+                />
+              </m.div>
+            </AnimatePresence>
+          </div>
+
+          {/* Close */}
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="absolute -top-4 -right-4 md:top-2 md:right-2 rounded-full bg-white/90 hover:bg-white text-gray-800 shadow-lg ring-1 ring-black/10 p-2"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
+
+          {/* Prev */}
+          <button
+            onClick={goPrev}
+            aria-label="Previous"
+            className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-white/90 hover:bg-white text-gray-800 shadow-lg ring-1 ring-black/10 p-3"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m15 18-6-6 6-6"/></svg>
+          </button>
+
+          {/* Next */}
+          <button
+            onClick={goNext}
+            aria-label="Next"
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-white/90 hover:bg-white text-gray-800 shadow-lg ring-1 ring-black/10 p-3"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+
+          {/* Counter */}
+          <div className="absolute left-1/2 -translate-x-1/2 bottom-3 text-xs md:text-sm text-white/80">
+            {index + 1} / {images.length}
+          </div>
+        </div>
+      </div>
+    </LazyMotion>
+  );
+}
+
+
+----- FILE: src/components/Navbar.tsx -----
+"use client";
+import Link from "next/link";
+import Image from "next/image";
+import { useState } from "react";
+
+export default function Navbar(){
+  const [open, setOpen] = useState(false);
+  return (
+    <header className="sticky top-0 z-50 bg-white/90 backdrop-blur border-b">
+      <nav className="container h-16 flex items-center justify-between">
+        <Link href="/" className="flex items-center gap-3">
+    <Image src="/logo.svg" alt="Forrester Fields" width={110} height={32} priority />
+  </Link>
+
+        {/* desktop */}
+        <div className="hidden md:flex gap-6 items-center text-sm">
+          <Link href="/services">Services</Link>
+          <Link href="/venue">Venue</Link>
+          <Link href="/gallery">Gallery</Link>
+          <Link href="/event-pool">Event Pool</Link>
+          <Link href="/contact" className="btn btn-primary text-white">Contact</Link>
+        </div>
+
+        {/* mobile burger */}
+        <button aria-label="Menu" className="md:hidden inline-flex items-center gap-2 border rounded-md px-3 py-2"
+          onClick={()=>setOpen(v=>!v)}>
+          <span>Menu</span>
+          <svg width="18" height="18" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round"/></svg>
+        </button>
+      </nav>
+
+      {/* mobile drawer */}
+      {open && (
+        <div className="md:hidden border-t bg-white">
+          <div className="container py-3 grid gap-3 text-sm">
+            <Link href="/services" onClick={()=>setOpen(false)}>Services</Link>
+            <Link href="/venue" onClick={()=>setOpen(false)}>Venue</Link>
+            <Link href="/gallery" onClick={()=>setOpen(false)}>Gallery</Link>
+            <Link href="/event-pool" onClick={()=>setOpen(false)}>Event Pool</Link>
+            <Link href="/contact" className="btn btn-primary w-fit text-white" onClick={()=>setOpen(false)}>Contact</Link>
+          </div>
+        </div>
+      )}
+    </header>
+  );
+}
+
+
+----- FILE: src/components/SeoJsonLd.tsx -----
+export default function SeoJsonLd() {
+  const data = {
+    "@context": "https://schema.org",
+    "@type": ["Organization","LocalBusiness","EventVenue","WeddingService"],
+    name: "Forrester Fields",
+    url: "https://forresterfields.vercel.app/",
+    telephone: "+1-000-000-0000",
+    areaServed: ["Walton County","Greater Atlanta"],
+    address: {
+      "@type": "PostalAddress",
+      addressLocality: "Loganville",
+      addressRegion: "GA",
+      addressCountry: "US"
+    },
+    sameAs: [
+      "https://instagram.com/forresterfields",
+      "https://facebook.com/forresterfields"
+    ]
+  };
+  return (
+    <script type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }} />
+  );
+}
+
+
+----- FILE: src/components/ServicesAndPackages.tsx -----
+"use client";
+import Link from "next/link";
+
+export default function ServicesAndPackages() {
+  return (
+    <section className="mt-10 space-y-12">
+      {/* What We Offer */}
+      <div>
+        <h2 className="font-['Playfair_Display'] text-xl font-light tracking-tight text-slate-800">
+          What we offer
+        </h2>
+        <ul className="mt-3 list-disc pl-6 text-slate-700 leading-7">
+          <li>
+            <span className="font-medium text-slate-900">Event planning</span> — full, month-of, and day-of services.
+          </li>
+          <li>
+            <span className="font-medium text-slate-900">Event hosting at our private venue</span> — flexible indoor/outdoor spaces with lake views.
+          </li>
+          <li>
+            <span className="font-medium text-slate-900">Event Pool of workers</span> — staff your event with our vetted team.{" "}
+            <Link href="/event-pool" className="underline hover:no-underline">Explore the Event Pool</Link>.
+          </li>
+        </ul>
+      </div>
+
+      {/* Venue Rental Prices */}
+      <div>
+        <h2 className="font-['Playfair_Display'] text-xl font-light tracking-tight text-slate-800">
+          Venue Rental Prices
+        </h2>
+
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          {/* A */}
+          <article className="rounded-xl border bg-white p-4 shadow-sm">
+            <div className="text-sm uppercase tracking-wide text-slate-500">A. Pavilion & Field</div>
+            <h3 className="mt-1 text-base font-semibold text-slate-900">Overlooking the lake</h3>
+            <p className="mt-1.5 text-lg font-semibold">$1,500</p>
+            <p className="mt-1.5 text-slate-700">Available on its own.</p>
+          </article>
+
+          {/* B */}
+          <article className="rounded-xl border bg-white p-4 shadow-sm">
+            <div className="text-sm uppercase tracking-wide text-slate-500">B. Front of House, Backyard & Basement</div>
+            <h3 className="mt-1 text-base font-semibold text-slate-900">Includes basement bathroom</h3>
+            <p className="mt-1.5 text-lg font-semibold">$3,000</p>
+            <p className="mt-1.5 text-slate-700">Available on its own.</p>
+          </article>
+
+          {/* C */}
+          <article className="rounded-xl border bg-white p-4 shadow-sm">
+            <div className="text-sm uppercase tracking-wide text-slate-500">C. Interior (add-on)</div>
+            <h3 className="mt-1 text-base font-semibold text-slate-900">Add to A or B</h3>
+            <p className="mt-1.5 text-lg font-semibold">$1,250</p>
+            <p className="mt-1.5 text-slate-700">
+              Most of the main floor (1 bathroom) & all of the upstairs (2 bathrooms).
+            </p>
+          </article>
+
+          {/* D */}
+          <article className="rounded-xl border bg-white p-4 shadow-sm">
+            <div className="text-sm uppercase tracking-wide text-slate-500">D. Overflow Parking</div>
+            <h3 className="mt-1 text-base font-semibold text-slate-900">Shuttle convenience</h3>
+            <p className="mt-1.5 text-lg font-semibold">$500</p>
+            <p className="mt-1.5 text-slate-700">
+              Bring your own golf cart or use ours (1 driver included). Additional cart/driver available on request—pricing varies.
+            </p>
+          </article>
+
+          {/* E */}
+          <article className="rounded-xl border bg-white p-4 shadow-sm md:col-span-2">
+            <div className="text-sm uppercase tracking-wide text-slate-500">E. All-Access Venue Package</div>
+            <h3 className="mt-1 text-base font-semibold text-slate-900">Everything above, bundled</h3>
+            <p className="mt-1.5 text-lg font-semibold">$6,000</p>
+            <ul className="mt-3 text-slate-700 space-y-2 list-disc pl-6">
+              <li>Upper & lower field parking with use of 1 golf cart to shuttle guests (1 cart & driver included)</li>
+              <li>Pavilion & Field</li>
+              <li>Front, Back & Interior of Home (excluding owners’ private quarters)</li>
+              <li>Up to 11 hours day-of access (8am–10pm)</li>
+              <li>Access as needed for set-up week-of event</li>
+              <li>Unlimited access for clean-up the day after event</li>
+            </ul>
+          </article>
+        </div>
+
+        <div className="mt-5 rounded-lg border bg-slate-50 p-4 text-slate-700">
+          <p className="font-medium text-slate-900">All packages include:</p>
+          <ul className="mt-1.5 list-disc pl-6 space-y-1">
+            <li>Separate dressing areas for groomsmen & bridal party</li>
+            <li>Cedar cross</li>
+            <li>One golf cart + driver</li>
+            <li>Parking in adjacent field</li>
+            <li>All available tables, chairs, tablecloths, decor</li>
+            <li>Pre-hung string lighting</li>
+            <li>Access 8am–10pm day-of for paid spaces; limited access week-of for set-up/rehearsal; day-after clean-up</li>
+          </ul>
+        </div>
+      </div>
+
+      {/* Planner Services */}
+      <div>
+        <h2 className="font-['Playfair_Display'] text-xl font-light tracking-tight text-slate-800">
+          Wedding Planner Services
+        </h2>
+
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          {/* Full Planner */}
+          <article className="rounded-xl border bg-white p-4 shadow-sm">
+            <h3 className="text-base font-semibold text-slate-900">Full Planner Services</h3>
+            <p className="mt-1 text-lg font-semibold">10% of budget (min $2,500)</p>
+            <p className="mt-1.5 text-slate-700">
+              Cost is 10% of overall wedding budget (as determined by an online planner tool we’ll use together). Includes
+              online & in-person collaboration from engagement until your grand exit.
+            </p>
+          </article>
+
+          {/* Month-of */}
+          <article className="rounded-xl border bg-white p-4 shadow-sm">
+            <h3 className="text-base font-semibold text-slate-900">Month-of Planner / Coordinator</h3>
+            <p className="mt-1 text-lg font-semibold">$1,500</p>
+            <p className="mt-1.5 text-slate-700">
+              We finalize your existing plans, tie up loose ends, and ensure everything runs smoothly. Rehearsal & ceremony included.
+            </p>
+          </article>
+
+          {/* Day-of */}
+          <article className="rounded-xl border bg-white p-4 shadow-sm">
+            <h3 className="text-base font-semibold text-slate-900">Day-of Coordinator</h3>
+            <p className="mt-1 text-lg font-semibold">$400</p>
+            <p className="mt-1.5 text-slate-700">
+              Planning & leading your ceremony rehearsal and ensuring your ceremony goes off without a hitch.
+            </p>
+          </article>
+
+          {/* Reception Point Person */}
+          <article className="rounded-xl border bg-white p-4 shadow-sm">
+            <h3 className="text-base font-semibold text-slate-900">Reception Point Person</h3>
+            <p className="mt-1 text-lg font-semibold">$250 (add-on)</p>
+            <p className="mt-1.5 text-slate-700">
+              Included with Full Planning; add-on for Month-of/Day-of. We handle the transition from ceremony to reception and keep
+              things smooth through the big exit.
+            </p>
+          </article>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+
+----- FILE: src/data/gallery.ts -----
+export const GALLERY_IMAGES = [
+  "/media/forresterfields/gallery/FB_IMG_1760900897404.jpg",
+  "/media/forresterfields/gallery/FB_IMG_1760900901760.jpg",
+  "/media/forresterfields/gallery/FB_IMG_1760900952547.jpg",
+  "/media/forresterfields/gallery/FB_IMG_1760900958514.jpg",
+  "/media/forresterfields/gallery/FB_IMG_1760900959829.jpg",
+  "/media/forresterfields/gallery/FB_IMG_1760900964594.jpg",
+  "/media/forresterfields/gallery/FB_IMG_1760900978015.jpg",
+  "/media/forresterfields/gallery/FB_IMG_1760900981941.jpg",
+  "/media/forresterfields/gallery/FB_IMG_1760900987066.jpg",
+  "/media/forresterfields/gallery/FB_IMG_1760900989971.jpg",
+  "/media/forresterfields/gallery/FB_IMG_1760900993463.jpg",
+  "/media/forresterfields/gallery/FB_IMG_1760901002425.jpg",
+  "/media/forresterfields/gallery/FB_IMG_1760901005860.jpg",
+  "/media/forresterfields/gallery/FB_IMG_1760901008233.jpg",
+  "/media/forresterfields/gallery/FB_IMG_1760901011298.jpg",
+  "/media/forresterfields/gallery/FB_IMG_1760901014744.jpg",
+  "/media/forresterfields/gallery/FB_IMG_1760901017102.jpg",
+  "/media/forresterfields/gallery/FB_IMG_1760901019240.jpg",
+  "/media/forresterfields/gallery/FB_IMG_1760901027010.jpg",
+  "/media/forresterfields/gallery/FB_IMG_1760901028874.jpg",
+  "/media/forresterfields/gallery/FB_IMG_1760901032241.jpg",
+  "/media/forresterfields/gallery/FB_IMG_1760901040620.jpg",
+  "/media/forresterfields/gallery/IMG-20251019-WA0001.jpg",
+  "/media/forresterfields/gallery/IMG-20251019-WA0002.jpg",
+  "/media/forresterfields/gallery/IMG-20251019-WA0003.jpg",
+  "/media/forresterfields/gallery/IMG-20251019-WA0004.jpg",
+  "/media/forresterfields/gallery/IMG-20251019-WA0005.jpg",
+  "/media/forresterfields/gallery/IMG-20251019-WA0006.jpg",
+  "/media/forresterfields/gallery/IMG-20251019-WA0007.jpg",
+  "/media/forresterfields/gallery/IMG-20251019-WA0008.jpg",
+  "/media/forresterfields/gallery/IMG-20251019-WA0009.jpg",
+  "/media/forresterfields/gallery/IMG-20251019-WA0010.jpg",
+  "/media/forresterfields/gallery/IMG-20251019-WA0011.jpg",
+  "/media/forresterfields/gallery/IMG-20251019-WA0012.jpg",
+  "/media/forresterfields/gallery/IMG-20251019-WA0014.jpg",
+  "/media/forresterfields/gallery/IMG-20251019-WA0017.jpg",
+  "/media/forresterfields/gallery/logo.jpg",
+  "/media/forresterfields/gallery/qt=q_4.jpeg",
+  "/media/forresterfields/gallery/rs=w_403,h_537.jpeg",
+  "/media/forresterfields/gallery/rs=w_806,h_1148.jpeg",
+  "/media/forresterfields/gallery/rs=w_806,h_1209.jpeg",
+  "/media/forresterfields/gallery/rs=w_806,h_1721.jpeg",
+  "/media/forresterfields/gallery/rs=w_806,h_453.jpeg",
+  "/media/forresterfields/gallery/rs=w_806,h_537.jpeg",
+  "/media/forresterfields/gallery/rs=w_806,h_540.jpeg",
+  "/media/forresterfields/gallery/rs=w_806,h_605.jpeg",
+  "/media/forresterfields/gallery/rs=w_806,h_606.jpeg"
+] as const;
+
+
+----- FILE: src/lib/email.ts -----
+type WorkerPayload = {
+  name?: string;
+  email?: string;
+  phone?: string;
+  city?: string;
+  age?: string;
+  availability?: string;
+  roles?: string[] | string;
+  references_text?: string;
+  experience?: string;
+};
+
+function toArray(v: unknown): string[] {
+  if (Array.isArray(v)) return v.map(String);
+  if (typeof v === "string") {
+    return v.split(/,|\s+/).map(s => s.trim()).filter(Boolean);
+  }
+  return [];
+}
+
+function buildMessage(p: WorkerPayload) {
+  const roles = toArray(p.roles).join(", ");
+  const lines = [
+    `A new worker application was submitted:`,
+    ``,
+    `Name: ${p.name ?? ""}`,
+    `Email: ${p.email ?? ""}`,
+    `Phone: ${p.phone ?? ""}`,
+    `City: ${p.city ?? ""}`,
+    `Age: ${p.age ?? ""}`,
+    `Availability: ${p.availability ?? ""}`,
+    `Roles: ${roles}`,
+    ``,
+    `References:`,
+    `${p.references_text ?? ""}`,
+    ``,
+    `Experience:`,
+    `${p.experience ?? ""}`,
+  ];
+  const text = lines.join("\n");
+  const html = `
+    <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;line-height:1.5">
+      <h2 style="margin:0 0 12px">New Worker Application</h2>
+      <table style="border-collapse:collapse">
+        <tr><td style="padding:4px 8px"><b>Name</b></td><td>${p.name ?? ""}</td></tr>
+        <tr><td style="padding:4px 8px"><b>Email</b></td><td>${p.email ?? ""}</td></tr>
+        <tr><td style="padding:4px 8px"><b>Phone</b></td><td>${p.phone ?? ""}</td></tr>
+        <tr><td style="padding:4px 8px"><b>City</b></td><td>${p.city ?? ""}</td></tr>
+        <tr><td style="padding:4px 8px"><b>Age</b></td><td>${p.age ?? ""}</td></tr>
+        <tr><td style="padding:4px 8px"><b>Availability</b></td><td>${p.availability ?? ""}</td></tr>
+        <tr><td style="padding:4px 8px"><b>Roles</b></td><td>${roles}</td></tr>
+      </table>
+      <p><b>References</b><br>${(p.references_text ?? "").replace(/\n/g,"<br>")}</p>
+      <p><b>Experience</b><br>${(p.experience ?? "").replace(/\n/g,"<br>")}</p>
+    </div>
+  `;
+  return { text, html };
+}
+
+export async function sendWorkerApplicationEmail(to: string, payload: WorkerPayload) {
+  const key = process.env.RESEND_API_KEY;
+  if (!key) {
+    console.warn("[email] RESEND_API_KEY missing; skipping email");
+    return;
+  }
+  const from = process.env.NOTIFY_FROM_EMAIL || "Forrester Fields <no-reply@forresterfields.app>";
+  const subject = "New Worker Application";
+  const { text, html } = buildMessage(payload);
+
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${key}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ from, to, subject, html, text }),
+  });
+
+  if (!res.ok) {
+    const msg = await res.text().catch(() => res.statusText);
+    console.warn("[email] Resend error:", res.status, msg);
+  }
+}
+
+
+----- FILE: src/lib/gallery.ts -----
+// AUTO-GENERATED by scripts/pin-gallery.js
+export type GalleryImage = string | { src: string; alt?: string };
+
+export const GALLERY_FILES: GalleryImage[] = [
+  "/media/forresterfields/50thsign.jpg",
+  "/media/forresterfields/album.jpg",
+  "/media/forresterfields/basement.jpg",
+  "/media/forresterfields/bluecupcake.jpg",
+  "/media/forresterfields/bookart1.jpg",
+  "/media/forresterfields/bookart2.jpg",
+  "/media/forresterfields/bridebottle.jpeg",
+  "/media/forresterfields/bridefather.jpeg",
+  "/media/forresterfields/bridesmaids.jpg",
+  "/media/forresterfields/bridge2.jpg",
+  "/media/forresterfields/bridgeceremony.jpg",
+  "/media/forresterfields/bridgemain.jpg",
+  "/media/forresterfields/cake2.jpg",
+  "/media/forresterfields/cakeHW.jpg",
+  "/media/forresterfields/cakenice.jpg",
+  "/media/forresterfields/ceremony.jpeg",
+  "/media/forresterfields/ceremony2.jpeg",
+  "/media/forresterfields/china.jpg",
+  "/media/forresterfields/couplecake.jpeg",
+  "/media/forresterfields/couplecutcake.jpeg",
+  "/media/forresterfields/cross1.jpg",
+  "/media/forresterfields/cupcakecenter.jpg",
+  "/media/forresterfields/cupcakechocsprinkles.jpg",
+  "/media/forresterfields/cupcakestand.jpg",
+  "/media/forresterfields/deck.jpg",
+  "/media/forresterfields/door.jpeg",
+  "/media/forresterfields/drivewaycouple.jpeg",
+  "/media/forresterfields/entrance.jpeg",
+  "/media/forresterfields/field.jpg",
+  "/media/forresterfields/fire1.jpg",
+  "/media/forresterfields/fire2.jpg",
+  "/media/forresterfields/fireworks.jpg",
+  "/media/forresterfields/frame.jpg",
+  "/media/forresterfields/fruitplatter.jpg",
+  "/media/forresterfields/game.jpg",
+  "/media/forresterfields/getready.jpeg",
+  "/media/forresterfields/greencupcake1.jpg",
+  "/media/forresterfields/greencupcake2.jpg",
+  "/media/forresterfields/groupcasual.jpeg",
+  "/media/forresterfields/house1.jpeg",
+  "/media/forresterfields/house2.jpeg",
+  "/media/forresterfields/insidesetting.jpg",
+  "/media/forresterfields/lake.jpg",
+  "/media/forresterfields/nightpool.jpg",
+  "/media/forresterfields/pigroast.jpg",
+  "/media/forresterfields/preview1.jpeg",
+  "/media/forresterfields/preview2.jpeg",
+  "/media/forresterfields/preview3.jpeg",
+  "/media/forresterfields/preview4.jpg",
+  "/media/forresterfields/preview5.jpeg",
+  "/media/forresterfields/preview6.jpeg",
+  "/media/forresterfields/preview7.jpg",
+  "/media/forresterfields/preview8.jpeg",
+  "/media/forresterfields/primas.jpg",
+  "/media/forresterfields/sign.jpg",
+  "/media/forresterfields/stairs.jpeg",
+  "/media/forresterfields/stairs2.jpg",
+  "/media/forresterfields/stairwell.jpg",
+  "/media/forresterfields/stairwell2.jpeg",
+  "/media/forresterfields/table.jpg",
+  "/media/forresterfields/tables.jpg",
+];
+
+
+----- FILE: src/lib/mailer.ts -----
+export type PlannerEmailData = {
+  planner: string;
+  email: string;
+  phone: string;
+  event_date: string;
+  city_venue: string;
+  roles_needed: string;
+  notes: string;
+  siteUrl: string; // e.g. https://forresterfields.vercel.app
+};
+
+export function buildPlannerEmailHTML(d: PlannerEmailData) {
+  const safe = (s: string) => (s || "").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const noteHTML = safe(d.notes).replace(/\n/g, "<br/>");
+  const btnUrl = `${d.siteUrl}/admin/requests`;
+
+  return `<!doctype html>
+<html>
+  <head><meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width"/>
+    <style>
+      body{margin:0;background:#f6f7fb;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#111}
+      .wrap{max-width:640px;margin:24px auto;padding:0 16px}
+      .card{background:#fff;border:1px solid #e6e8ee;border-radius:14px;overflow:hidden;box-shadow:0 1px 2px rgba(16,24,40,.04)}
+      .hdr{background:#123524;color:#fff;padding:20px 22px}
+      .hdr h1{font-size:18px;line-height:1.2;margin:0}
+      .body{padding:22px}
+      .row{display:flex;gap:12px;margin:10px 0}
+      .key{width:140px;color:#475467}
+      .val{flex:1;color:#101828}
+      .btn{display:inline-block;margin-top:16px;background:#184A2C;color:#fff;text-decoration:none;padding:12px 18px;border-radius:10px;font-weight:600}
+      .muted{color:#667085;font-size:12px;margin-top:18px}
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="card">
+        <div class="hdr"><h1>New Planner Request</h1></div>
+        <div class="body">
+          <div class="row"><div class="key">Planner</div><div class="val">${safe(d.planner)}</div></div>
+          <div class="row"><div class="key">Email</div><div class="val">${safe(d.email)}</div></div>
+          <div class="row"><div class="key">Phone</div><div class="val">${safe(d.phone)}</div></div>
+          <div class="row"><div class="key">Event date</div><div class="val">${safe(d.event_date)}</div></div>
+          <div class="row"><div class="key">City / Venue</div><div class="val">${safe(d.city_venue)}</div></div>
+          <div class="row"><div class="key">Roles needed</div><div class="val">${safe(d.roles_needed)}</div></div>
+          <div class="row" style="align-items:flex-start"><div class="key">Notes</div><div class="val">${noteHTML || "—"}</div></div>
+          <a class="btn" href="${btnUrl}">View in Admin</a>
+          <div class="muted">Sent from ${safe(d.siteUrl.replace(/^https?:\/\//,""))}</div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>`;
+}
+
+export function buildPlannerEmailText(d: PlannerEmailData) {
+  return [
+    `Planner: ${d.planner}`,
+    `Email: ${d.email}`,
+    `Phone: ${d.phone}`,
+    `Event date: ${d.event_date}`,
+    `City/Venue: ${d.city_venue}`,
+    `Roles needed: ${d.roles_needed}`,
+    `Notes:`,
+    d.notes || "—",
+    "",
+    `View: ${d.siteUrl}/admin/requests`,
+  ].join("\n");
+}
+
+
+----- FILE: src/lib/previews.ts -----
+import fs from "fs";
+import path from "path";
+
+/** Returns ordered list of /media/forresterfields/preview*.{jpg,png,webp} */
+export function getPreviewImages(): string[] {
+  const dir = path.join(process.cwd(), "public", "media", "forresterfields");
+  if (!fs.existsSync(dir)) return [];
+
+  const files = fs.readdirSync(dir);
+  const keep = files.filter(f =>
+    /^preview\d+\.(jpe?g|png|webp)$/i.test(f)
+  );
+
+  // natural numeric order: preview1, preview2, … preview10
+  keep.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+
+  return keep.map(f => `/media/forresterfields/${f}`);
+}
+
+
+----- FILE: src/lib/resend.ts -----
+import { Resend } from "resend";
+
+const apiKey = process.env.RESEND_API_KEY;
+if (!apiKey) {
+  throw new Error("RESEND_API_KEY is not set");
+}
+
+export const resend = new Resend(apiKey);
+export default resend;
+
+
+----- FILE: src/lib/supabase.ts -----
+import { createClient } from '@supabase/supabase-js';
+
+export const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
+
+export default supabase;
+
+
+----- FILE: src/lib/supabaseAdmin.ts -----
+import { createClient } from '@supabase/supabase-js';
+
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const serviceKey = process.env.SUPABASE_SERVICE_ROLE!;
+
+export const supabaseAdmin = createClient(url, serviceKey, {
+  auth: { persistSession: false },
+});
+
+export function getSupabaseAdmin() {
+  return supabaseAdmin;
+}
+
+export default supabaseAdmin;
+
+
+----- FILE: src/lib/supabaseClient.ts -----
+import { createClient } from "@supabase/supabase-js";
+
+export const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
+
+
+----- FILE: src/middleware.ts -----
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+
+export const config = {
+  matcher: ["/admin/:path*"],
+};
+
+export function middleware(req: NextRequest) {
+  const user = process.env.ADMIN_USER || "";
+  const pass = process.env.ADMIN_PASS || "";
+
+  // If not set, allow access (so local dev won’t block you)
+  if (!user || !pass) return NextResponse.next();
+
+  const auth = req.headers.get("authorization") || "";
+  const [scheme, encoded] = auth.split(" ");
+  if (scheme !== "Basic" || !encoded) {
+    return new NextResponse("Auth required", {
+      status: 401,
+      headers: { "WWW-Authenticate": 'Basic realm="ForresterFields Admin"' },
+    });
+  }
+
+  const [inUser, inPass] = Buffer.from(encoded, "base64").toString().split(":");
+  if (inUser === user && inPass === pass) return NextResponse.next();
+
+  return new NextResponse("Forbidden", { status: 403 });
+}
+
+
+----- FILE: package.json -----
+{
+  "name": "forresterfields",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "CHOKIDAR_USEPOLLING=1 WATCHPACK_POLLING=true NEXT_DISABLE_LIGHTNINGCSS=1 next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@react-email/render": "^1.3.2",
+    "@supabase/supabase-js": "^2.75.0",
+    "framer-motion": "^12.23.24",
+    "next": "15.5.4",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "resend": "^6.1.3"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "autoprefixer": "^10.4.21",
+    "eslint": "^9",
+    "eslint-config-next": "15.5.4",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.13",
+    "typescript": "^5"
+  }
+}
+
+
+----- FILE: next.config.js -----
+/** @type {import('next').NextConfig} */
+const isDev = process.env.NODE_ENV !== "production";
+
+const nextConfig = {
+  images: {
+    // Disable optimization locally to avoid _next/image proxy timeouts
+    unoptimized: isDev,
+    remotePatterns: [
+      { protocol: 'https', hostname: 'images.unsplash.com' },
+      { protocol: 'https', hostname: 'images.pexels.com' },
+      { protocol: 'https', hostname: 'picsum.photos' },
+    ],
+  },
+};
+module.exports = nextConfig;
+
+
+----- FILE: vercel.json -----
+{
+  "crons": [
+    { "path": "/api/requests/auto-age", "schedule": "0 0 * * *" }
+  ]
+}
+
+
+----- FILE: .gitignore -----
+node_modules/
+.next/
+.out/
+.vercel/
+.env
+.env.*
+*.mp4
+*.mov
+*.m4v
+*.webm
+*.zip
+public/media/*
+!public/media/forresterfields/**
+
+public/media/**
+
+
+----- FILE: .vercelignore -----
+.next
+node_modules
+.vercel
+.git
+.gitignore
+.env
+.env.*
+*.log
+
+

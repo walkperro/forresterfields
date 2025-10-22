@@ -1,4 +1,4 @@
-import { getGalleryImages } from "@/lib/gallery";
+import { GALLERY_FILES } from "@/lib/gallery";
 import GalleryGrid from "@/components/GalleryGrid";
 
 export const metadata = {
@@ -7,16 +7,16 @@ export const metadata = {
 };
 
 export default async function GalleryPage() {
-  const images = getGalleryImages();
+  const images = GALLERY_FILES;
   return (
     <main className="pb-16">
-      <section className="mx-auto max-w-6xl px-4 pt-10 pb-6">
-        <h1 className="font-serif text-4xl font-semibold">Gallery</h1>
+      <section className="mx-auto max-w-6xl px-4 py-10">
+        <h1 className="font-serif text-4xl font-semibold tracking-tight">Gallery</h1>
         <p className="mt-3 text-lg text-neutral-600">
           A peek at recent weddings at Forrester Fields.
         </p>
       </section>
-      <GalleryGrid images={images} />
+      <GalleryGrid images={images}/>
     </main>
   );
 }

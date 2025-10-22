@@ -1,0 +1,500 @@
+----- FILE: src/app/admin/jobs/AdminJobsClient.tsx -----
+"use client";
+
+import { useState } from "react";
+
+export type JobRow = {
+  id: string;
+  created_at?: string | null;
+  title: string | null;
+  event_date: string | null;
+  location: string | null;
+  roles: string[];           // text[] in supabase (normalized in server)
+  pay: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  notes: string | null;
+  status: "open" | "closed";
+};
+
+type Props = { initialJobs: JobRow[] };
+
+export default function AdminJobsClient({ initialJobs }: Props) {
+  const [jobs, setJobs] = useState<JobRow[]>(
+    Array.isArray(initialJobs) ? initialJobs : []
+  );
+  const [busy, setBusy] = useState(false);
+
+  async function handleCreate(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (busy) return;
+    setBusy(true);
+
+    // 🔧 keep a stable reference to the form BEFORE any await calls
+    const form = e.currentTarget;
+
+    try {
+      const fd = new FormData(form);
+      const res = await fetch("/api/jobs/create", { method: "POST", body: fd });
+      const j = await res.json();
+      if (!res.ok || !j?.ok) throw new Error(j?.error || `Create failed (${res.status})`);
+
+      const newJob: JobRow = j.job;
+      setJobs((prev) => [newJob, ...prev]); // optimistic add
+      form.reset(); // safe now because we cached the node
+    } catch (err) {
+      alert((err as Error).message || "Create failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm("Delete this job?")) return;
+    const prev = jobs;
+    setJobs(prev.filter((j) => j.id !== id)); // optimistic
+    try {
+      const res = await fetch("/api/jobs/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok || !j?.ok) throw new Error(j?.error || `Delete failed (${res.status})`);
+    } catch (err) {
+      setJobs(prev); // rollback
+      alert((err as Error).message || "Delete failed");
+    }
+  }
+
+  async function handleStatus(id: string, status: JobRow["status"]) {
+    const prev = jobs;
+    setJobs(prev.map((j) => (j.id === id ? { ...j, status } : j)));
+    try {
+      const res = await fetch("/api/jobs/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, status }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok || !j?.ok) throw new Error(j?.error || `Update failed (${res.status})`);
+    } catch (err) {
+      setJobs(prev); // rollback
+      alert((err as Error).message || "Update failed");
+    }
+  }
+
+  return (
+    <div className="space-y-8">
+      {/* Create form */}
+      <form onSubmit={handleCreate} className="rounded-xl border p-4 space-y-3">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <input name="title" placeholder="Title" className="border rounded-lg px-3 py-2" />
+          <input name="event_date" type="date" className="border rounded-lg px-3 py-2" />
+          <input name="location" placeholder="Location" className="border rounded-lg px-3 py-2" />
+          <input name="roles" placeholder="Roles (comma separated)" className="border rounded-lg px-3 py-2" />
+          <input name="pay" placeholder="Pay (e.g., $20/hr)" className="border rounded-lg px-3 py-2" />
+          <input name="start_time" placeholder="Start time (e.g., 3:00 PM)" className="border rounded-lg px-3 py-2" />
+          <input name="end_time" placeholder="End time (e.g., 10:00 PM)" className="border rounded-lg px-3 py-2" />
+        </div>
+        <textarea name="notes" placeholder="Notes" className="w-full border rounded-lg px-3 py-2 min-h-24" />
+        <div className="flex items-center gap-3">
+          <select name="status" defaultValue="open" className="border rounded-lg px-3 py-2">
+            <option value="open">open</option>
+            <option value="closed">closed</option>
+          </select>
+          <button disabled={busy} className="rounded-lg border px-4 py-2 hover:bg-slate-50">
+            {busy ? "Creating..." : "Create job"}
+          </button>
+        </div>
+      </form>
+
+      {/* Table */}
+      <div className="overflow-x-auto rounded-xl border bg-white">
+        <table className="min-w-full text-sm">
+          <thead className="bg-gray-50 text-left">
+            <tr>
+              <th className="px-3 py-2">Title</th>
+              <th className="px-3 py-2">Date</th>
+              <th className="px-3 py-2">Location</th>
+              <th className="px-3 py-2">Roles</th>
+              <th className="px-3 py-2">Pay</th>
+              <th className="px-3 py-2">Time</th>
+              {/* Notes now always visible */}
+              <th className="px-3 py-2">Notes</th>
+              <th className="px-3 py-2">Status</th>
+              <th className="px-3 py-2">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {jobs.length === 0 && (
+              <tr>
+                <td className="px-3 py-4 text-gray-500" colSpan={9}>No jobs yet.</td>
+              </tr>
+            )}
+            {jobs.map((j) => {
+              const time = [j.start_time, j.end_time].filter(Boolean).join(" – ") || "—";
+              const roles = Array.isArray(j.roles) ? j.roles.join(", ") : "—";
+              return (
+                <tr key={j.id} className="border-t">
+                  <td className="px-3 py-2">{j.title ?? "—"}</td>
+                  <td className="px-3 py-2">{j.event_date ?? "—"}</td>
+                  <td className="px-3 py-2">{j.location ?? "—"}</td>
+                  <td className="px-3 py-2">{roles}</td>
+                  <td className="px-3 py-2">{j.pay ?? "—"}</td>
+                  <td className="px-3 py-2">{time}</td>
+                  <td className="px-3 py-2 max-w-[18rem]">
+                    <span className="line-clamp-2">{j.notes ?? "—"}</span>
+                  </td>
+                  <td className="px-3 py-2">
+                    <select
+                      value={j.status}
+                      onChange={(e) => handleStatus(j.id, e.target.value as JobRow["status"])}
+                      className="border rounded px-2 py-1"
+                    >
+                      <option value="open">open</option>
+                      <option value="closed">closed</option>
+                    </select>
+                  </td>
+                  <td className="px-3 py-2">
+                    <button
+                      onClick={() => handleDelete(j.id)}
+                      className="px-3 py-1 rounded-md border border-red-700 text-red-800 text-xs hover:bg-red-50"
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+
+----- FILE: src/app/admin/jobs/page.tsx -----
+import { supabase } from "@/lib/supabase";
+import AdminJobsClient from "./AdminJobsClient";
+import AdminNav from "@/components/AdminNav";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+type JobRow = {
+  id: string;
+  created_at: string | null;
+  title: string | null;
+  event_date: string | null;   // yyyy-mm-dd
+  location: string | null;
+  roles: string[];             // normalized to array here
+  pay: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  notes: string | null;
+  status: "open" | "closed";
+};
+
+// helpers to safely coerce unknown -> desired shapes
+function s(v: unknown): string | null {
+  const out = String(v ?? "").trim();
+  return out ? out : null;
+}
+
+function rolesToArray(v: unknown): string[] {
+  if (Array.isArray(v)) {
+    return v
+      .filter((x): x is string => typeof x === "string")
+      .map((x) => x.trim())
+      .filter(Boolean);
+  }
+  if (typeof v === "string") {
+    return v
+      .split(/,|\s+/)
+      .map((x) => x.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
+function statusFrom(v: unknown): "open" | "closed" {
+  const val = String(v ?? "").toLowerCase();
+  return val === "closed" ? "closed" : "open";
+}
+
+export default async function AdminJobsPage() {
+  const { data, error } = await supabase
+    .from("jobs")
+    .select("*")
+    .order("created_at", { ascending: false, nullsFirst: false })
+  .order("event_date", { ascending: true, nullsFirst: false });
+
+  const normalizedRows: JobRow[] = (data as unknown[] | null ?? []).map((raw) => {
+    const r = raw as Record<string, unknown>;
+    return {
+      id: String(r.id ?? ""),
+      created_at: s(r.created_at),
+      title: s(r.title),
+      event_date: s(r.event_date),
+      location: s(r.location),
+      roles: rolesToArray(r.roles),
+      pay: s(r.pay),
+      start_time: s(r.start_time),
+      end_time: s(r.end_time),
+      notes: s(r.notes),
+      status: statusFrom(r.status),
+    };
+  });
+
+  return (
+    <main className="max-w-5xl mx-auto px-4 py-10">
+      <h1 className="font-['Playfair_Display'] text-[2rem] font-light tracking-tight text-slate-800"><span className="block mb-6">Job Posts</span></h1>
+      <AdminNav active="jobs" />
+      <p className="mt-2 text-slate-600">Create and manage roles that appear on the Workers page.</p>
+
+      {error && (
+        <div className="mt-4 rounded-md border border-red-200 bg-red-50 p-3 text-red-700">
+          Failed to load jobs: {error.message}
+        </div>
+      )}
+
+      <div className="mt-8">
+        <AdminJobsClient initialJobs={normalizedRows} />
+      </div>
+    </main>
+  );
+}
+
+
+----- FILE: src/app/admin/page.tsx -----
+import Link from "next/link";
+
+export default function AdminIndex() {
+  return (
+    <main className="max-w-5xl mx-auto px-4 py-12">
+      <h1 className="font-['Playfair_Display'] text-[2rem] font-light tracking-tight text-slate-800 mb-6">Admin</h1>
+      <p className="mt-2 text-slate-600">Choose a section:</p>
+
+      <div className="mt-6 grid gap-4">
+        <Link href="/admin/requests" className="block rounded-xl border p-6 bg-white hover:bg-gray-50">
+          <div className="text-xl font-semibold">Planner Requests</div>
+          <div className="text-gray-600 mt-1">Review & track inbound planner requests.</div>
+        </Link>
+
+        <Link href="/admin/workers" className="block rounded-xl border p-6 bg-white hover:bg-gray-50">
+          <div className="text-xl font-semibold">Workers</div>
+          <div className="text-gray-600 mt-1">Review applications and manage status.</div>
+        </Link>
+
+        <Link href="/admin/jobs" className="block rounded-xl border p-6 bg-white hover:bg-gray-50">
+          <div className="text-xl font-semibold">Job Posts</div>
+          <div className="text-gray-600 mt-1">Create, open/close, and delete worker roles.</div>
+        </Link>
+      </div>
+    </main>
+  );
+}
+
+
+----- FILE: src/app/admin/requests/ClientTable.tsx -----
+"use client";
+
+import { useMemo, useState } from "react";
+import type { PlannerRequest } from "./types";
+
+type ClientProps = { initialRows: PlannerRequest[] };
+
+const STATUS_LABELS = {
+  new: "New",
+  contacted: "Contacted",
+  booked: "Booked",
+  archived: "Archived", // display label changed to Denied
+} as const;
+
+const STATUS_OPTIONS = Object.keys(STATUS_LABELS) as Array<keyof typeof STATUS_LABELS>;
+
+function rowClasses(status?: PlannerRequest["status"]) {
+  const s = (status ?? "new") as NonNullable<PlannerRequest["status"]>;
+  const base = "border-t transition-shadow";
+  if (s === "booked") return `${base} bg-green-50`;
+  if (s === "archived") return `${base} bg-red-50`;
+  if (s === "contacted") return `${base} bg-blue-50`;
+  return `${base} bg-yellow-50 ring-1 ring-yellow-300/70 shadow-[0_0_16px_rgba(234,179,8,0.25)]`;
+}
+
+export default function ClientTable({ initialRows }: ClientProps) {
+  const [q, setQ] = useState("");
+  const [status, setStatus] = useState<"all" | keyof typeof STATUS_LABELS>("all");
+  const [rows, setRows] = useState<PlannerRequest[]>(initialRows);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const filtered = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return rows.filter((r) => {
+      const okStatus = status === "all" ? true : (r.status || "new") === status;
+      if (!needle) return okStatus;
+      const hay =
+        [
+          r.planner_name,
+          r.email,
+          r.phone,
+          r.city_venue,
+          r.roles_needed,
+          r.event_date,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase() || "";
+      return okStatus && hay.includes(needle);
+    });
+  }, [rows, q, status]);
+
+  async function updateStatus(id: string, next: NonNullable<PlannerRequest["status"]>) {
+    try {
+      setBusyId(id);
+      const basic = btoa(`${process.env.NEXT_PUBLIC_BASIC_USER ?? ""}:${process.env.NEXT_PUBLIC_BASIC_PASS ?? ""}`);
+      const res = await fetch("/api/requests/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Basic ${basic}` },
+        body: JSON.stringify({ id, status: next }),
+      });
+      const json = (await res.json()) as { ok: boolean };
+      if (json.ok) setRows((prev) => prev.map((r) => (r.id === id ? { ...r, status: next } : r)));
+      else alert("Update failed");
+    } catch {
+      alert("Update failed");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function deleteRequest(id: string) {
+    if (!confirm("Warning: This cannot be undone. Permanently delete this planner request?")) return;
+    try {
+      setBusyId(id);
+      const res = await fetch("/api/requests/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j?.error || `Delete failed (${res.status})`);
+      }
+      setRows(prev => prev.filter(r => r.id !== id));
+    } catch (e) {
+      console.error((e as Error).message);
+      alert("Delete failed");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  function copy(text: string | null) {
+    if (!text) return;
+    navigator.clipboard.writeText(text).catch(() => {});
+  }
+
+  function handleFilterChange(e: React.ChangeEvent<HTMLSelectElement>): void {
+    const val = e.target.value as "all" | keyof typeof STATUS_LABELS;
+    setStatus(val);
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center">
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search name, email, phone, venue, roles…"
+          className="w-full md:w-96 rounded-md border px-3 py-2"
+        />
+        <select value={status} onChange={handleFilterChange} className="w-full md:w-48 rounded-md border px-3 py-2">
+          <option value="all">All statuses</option>
+          {STATUS_OPTIONS.map((s) => (
+            <option key={s} value={s}>
+              {STATUS_LABELS[s]}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="overflow-x-auto rounded-lg border">
+        <table className="min-w-full text-sm">
+          <thead className="bg-gray-50 text-left">
+            <tr>
+              <th className="px-3 py-2">Created</th>
+              <th className="px-3 py-2">Planner</th>
+              <th className="px-3 py-2">Email</th>
+              <th className="px-3 py-2">Phone</th>
+              <th className="px-3 py-2">Event</th>
+              <th className="px-3 py-2">City/Venue</th>
+              <th className="px-3 py-2">Roles</th>
+              <th className="px-3 py-2">Status</th>
+              <th className="px-3 py-2">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((r) => (
+              <tr key={r.id} className={rowClasses(r.status)}>
+                <td className="px-3 py-2 whitespace-nowrap">{new Date(r.created_at).toLocaleString()}</td>
+                <td className="px-3 py-2">{r.planner_name || "-"}</td>
+                <td className="px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <a href={r.email ? `mailto:${r.email}` : "#"} className="underline">
+                      {r.email || "-"}
+                    </a>
+                    {r.email && (
+                      <button onClick={() => copy(r.email)} className="rounded border px-2 py-0.5" title="Copy email">
+                        Copy
+                      </button>
+                    )}
+                  </div>
+                </td>
+                <td className="px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    {r.phone || "-"}
+                    {r.phone && (
+                      <button onClick={() => copy(r.phone)} className="rounded border px-2 py-0.5" title="Copy phone">
+                        Copy
+                      </button>
+                    )}
+                  </div>
+                </td>
+                <td className="px-3 py-2">{r.event_date || "-"}</td>
+                <td className="px-3 py-2">{r.city_venue || "-"}</td>
+                <td className="px-3 py-2">{r.roles_needed || "-"}</td>
+                <td className="px-3 py-2">
+                  <select
+                    disabled={busyId === r.id}
+                    value={(r.status || "new") as string}
+                    onChange={(e) => updateStatus(r.id, e.target.value as NonNullable<PlannerRequest["status"]>)}
+                    className="rounded border px-2 py-1"
+                  >
+                    {STATUS_OPTIONS.map((s) => (
+                      <option key={s} value={s}>
+                        {STATUS_LABELS[s]}
+                      </option>
+                    ))}
+                  </select>
+                </td>
+                <td className="px-3 py-2">
+                  <button
+                    disabled={busyId === r.id}
+                    onClick={() => deleteRequest(r.id)}
+                    className="px-3 py-1 rounded-md border border-red-700 text-red-800 text-xs hover:bg-red-50"
+                  >
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {filtered.length === 0 && (
+              <tr>
+                <td className="px-3 py-6 text-center text-gray-500" colSpan={9}>
+                  No results
+                </td>
+              </tr>
+            )}

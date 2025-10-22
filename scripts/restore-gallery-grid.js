@@ -1,9 +1,11 @@
+const fs = require('fs');
+const f = 'src/components/GalleryGrid.tsx';
+const code = `\
 "use client";
 
 import Image from "next/image";
 import { useState } from "react";
 import { m, LazyMotion, domAnimation } from "framer-motion";
-import type { Variants } from "framer-motion";
 import Lightbox from "./Lightbox";
 
 export type GalleryImage = string | { src: string; alt?: string };
@@ -13,28 +15,25 @@ function toSrc(img: GalleryImage) {
 }
 function toAlt(img: GalleryImage, i: number) {
   return typeof img === "string"
-    ? `Forrester Fields photo ${i + 1}`
-    : img.alt || `Forrester Fields photo ${i + 1}`;
+    ? \`Forrester Fields photo \${i + 1}\`
+    : img.alt || \`Forrester Fields photo \${i + 1}\`;
 }
 
-// Easing & variants (typed) for smooth scroll-in
-const easeCubic: [number, number, number, number] = [0.22, 1, 0.36, 1];
-
-const container: Variants = {
+// Smooth scroll-in animation for column items
+const container = {
   hidden: { opacity: 1 },
   show: {
     opacity: 1,
     transition: { staggerChildren: 0.06, delayChildren: 0.02 },
   },
 };
-
-const item: Variants = {
+const item = {
   hidden: { opacity: 0, y: 14, scale: 0.995 },
   show: {
     opacity: 1,
     y: 0,
     scale: 1,
-    transition: { duration: 0.35, ease: easeCubic },
+    transition: { duration: 0.35, ease: "easeOut" },
   },
 };
 
@@ -54,7 +53,7 @@ export default function GalleryGrid({ images }: { images: GalleryImage[] }) {
     <LazyMotion features={domAnimation}>
       <>
         <section className="mx-auto max-w-6xl px-4 pb-16">
-          {/* 2–3 column masonry; smaller cards so ~3 rows show on load */}
+          {/* 2-column masonry, smaller cards so ~3 rows show on load */}
           <m.div
             className="columns-2 md:columns-3 gap-3 [column-fill:_balance]"
             variants={container}
@@ -74,7 +73,7 @@ export default function GalleryGrid({ images }: { images: GalleryImage[] }) {
                   <m.button
                     onClick={() => { setIndex(i); setOpen(true); }}
                     className="group block w-full overflow-hidden rounded-2xl bg-white/40 ring-1 ring-black/5 hover:ring-brand-gold"
-                    aria-label={`Open photo ${i + 1}`}
+                    aria-label={\`Open photo \${i + 1}\`}
                     whileHover={{ scale: 1.01 }}
                     transition={{ duration: 0.18 }}
                   >
@@ -106,3 +105,6 @@ export default function GalleryGrid({ images }: { images: GalleryImage[] }) {
     </LazyMotion>
   );
 }
+`;
+fs.writeFileSync(f, code, 'utf8');
+console.log('✅ Restored src/components/GalleryGrid.tsx (columns + scroll anim, logo/mainbridge excluded).');

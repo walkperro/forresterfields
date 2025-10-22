@@ -1,0 +1,500 @@
+    return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
+  }
+}
+
+
+----- FILE: src/app/api/jobs/create/route.ts -----
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+
+type JobStatus = "open" | "closed";
+type JobInsert = {
+  title: string | null;
+  event_date: string | null;
+  location: string | null;
+  roles: string[];
+  pay: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  notes: string | null;
+  status?: JobStatus;
+};
+
+function admin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+  const key = process.env.SUPABASE_SERVICE_ROLE || "";
+  if (!url || !key) throw new Error("Supabase env missing");
+  return createClient(url, key, { auth: { persistSession: false } });
+}
+
+function s(v: unknown): string {
+  return typeof v === "string" ? v.trim() : String(v ?? "").trim();
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const supa = admin();
+
+    // Accept JSON or FormData
+    const ct = (req.headers.get("content-type") || "").toLowerCase();
+    let body: Record<string, unknown> = {};
+    if (ct.includes("application/json")) {
+      body = (await req.json()) as Record<string, unknown>;
+    } else {
+      const fd = await req.formData();
+      body = Object.fromEntries(fd.entries());
+    }
+
+    const rolesCsv = s(body.roles);
+    const roles = rolesCsv ? rolesCsv.split(",").map(r => r.trim()).filter(Boolean) : [];
+
+    const payload: JobInsert = {
+      title: s(body.title) || null,
+      event_date: s(body.event_date) || null,
+      location: s(body.location) || null,
+      roles,
+      pay: s(body.pay) || null,
+      start_time: s(body.start_time) || null,
+      end_time: s(body.end_time) || null,
+      notes: s(body.notes) || null,
+      status: ((): JobStatus => (s(body.status).toLowerCase() === "closed" ? "closed" : "open"))(),
+    };
+
+    if (!payload.title || !payload.event_date) {
+      return NextResponse.json({ ok: false, error: "Title and Date are required." }, { status: 400 });
+    }
+
+    const { data, error } = await supa
+      .from("jobs")
+      .insert(payload)
+      .select("id,title,event_date,location,roles,pay,start_time,end_time,notes,status,created_at")
+      .single();
+
+    if (error) {
+      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ ok: true, job: data });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
+  }
+}
+
+
+----- FILE: src/app/api/jobs/delete/route.ts -----
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+
+function admin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+  const key = process.env.SUPABASE_SERVICE_ROLE || "";
+  if (!url || !key) throw new Error("Supabase env vars missing");
+  return createClient(url, key, { auth: { persistSession: false } });
+}
+
+const s = (v: unknown) => String(v ?? "").trim();
+
+export async function POST(req: NextRequest) {
+  try {
+    const supa = admin();
+    const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+    const id = s(body.id);
+    if (!id) return NextResponse.json({ ok: false, error: "Missing id" }, { status: 400 });
+
+    const { error } = await supa.from("jobs").delete().eq("id", id).limit(1);
+    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
+  }
+}
+
+
+----- FILE: src/app/api/jobs/update/route.ts -----
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+
+type JobStatus = "open" | "closed";
+
+function admin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+  const key = process.env.SUPABASE_SERVICE_ROLE || "";
+  if (!url || !key) throw new Error("Supabase env vars missing");
+  return createClient(url, key, { auth: { persistSession: false } });
+}
+
+const s = (v: unknown) => String(v ?? "").trim();
+function normalizeDate(v: unknown): string | null {
+  const raw = s(v);
+  if (!raw) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  const m = raw.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+  if (m) {
+    const mm = m[1].padStart(2, "0");
+    const dd = m[2].padStart(2, "0");
+    const yyyy = m[3];
+    return `${yyyy}-${mm}-${dd}`;
+  }
+  const d = new Date(raw);
+  if (!isNaN(d.valueOf())) {
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  }
+  return null;
+}
+
+function parseRoles(v: unknown): string[] | undefined {
+  if (v === undefined) return undefined;
+  if (Array.isArray(v)) return v.map(s).filter(Boolean);
+  if (typeof v === "string") return v.split(",").map((x) => x.trim()).filter(Boolean);
+  return [];
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const supa = admin();
+    const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+    const id = s(body.id);
+    if (!id) return NextResponse.json({ ok: false, error: "Missing id" }, { status: 400 });
+
+    const patch: Record<string, unknown> = {};
+    if (body.title !== undefined) patch.title = s(body.title) || null;
+    if (body.status !== undefined) {
+      const val = s(body.status).toLowerCase();
+      patch.status = (val === "closed" ? "closed" : "open") as JobStatus;
+    }
+    if (body.event_date !== undefined) patch.event_date = normalizeDate(body.event_date);
+    if (body.location !== undefined) patch.location = s(body.location) || null;
+    const roles = parseRoles(body.roles);
+    if (roles !== undefined) patch.roles = roles;
+    if (body.pay !== undefined) patch.pay = s(body.pay) || null;
+    if (body.start_time !== undefined) patch.start_time = s(body.start_time) || null;
+    if (body.end_time !== undefined) patch.end_time = s(body.end_time) || null;
+    if (body.notes !== undefined) patch.notes = s(body.notes) || null;
+
+    if (Object.keys(patch).length === 0)
+      return NextResponse.json({ ok: false, error: "No fields to update" }, { status: 400 });
+
+    const { error } = await supa.from("jobs").update(patch).eq("id", id).limit(1);
+    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
+  }
+}
+
+
+----- FILE: src/app/api/planner-request/route.ts -----
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+import resend from "@/lib/resend";
+import { buildPlannerEmailHTML, buildPlannerEmailText } from "@/lib/mailer";
+
+function admin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const key = process.env.SUPABASE_SERVICE_ROLE!;
+  return createClient(url, key, { auth: { persistSession: false } });
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    // Accept FormData (from the planners page)
+    const fd = await req.formData();
+
+    const planner = String(fd.get("planner") ?? "").trim();
+    const email = String(fd.get("email") ?? "").trim();
+    const phone = String(fd.get("phone") ?? "").trim();
+    const event_date = String(fd.get("event_date") ?? "").trim(); // yyyy-mm-dd from <input type="date">
+    const city_venue = String(fd.get("venue") ?? "").trim();
+    const roles_needed = String(fd.get("roles_needed") ?? "").trim();
+    const notes = String(fd.get("notes") ?? "").trim();
+
+    if (!planner || !email) {
+      return NextResponse.json({ ok: false, error: "Missing required fields" }, { status: 400 });
+    }
+
+    const supa = admin();
+
+    // Insert into planner_requests
+    const { data, error } = await supa
+      .from("planner_requests")
+      .insert({
+        planner_name: planner,
+        email,
+        phone,
+        event_date,      // store as text/date column as your table expects
+        city_venue,
+        roles_needed,
+        notes,
+        status: "new",
+      })
+      .select("id")
+      .single();
+
+    if (error) {
+      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    }
+
+    // Email notification to you
+    const origin = req.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL || "https://forresterfields.vercel.app";
+    const html = buildPlannerEmailHTML({
+      planner,
+      email,
+      phone,
+      event_date,
+      city_venue,
+      roles_needed,
+      notes,
+      siteUrl: origin,
+    });
+    const text = buildPlannerEmailText({
+      planner,
+      email,
+      phone,
+      event_date,
+      city_venue,
+      roles_needed,
+      notes,
+      siteUrl: origin,
+    });
+
+    // Replace this with your real inbox
+    await resend.emails.send({
+      from: "Forrester Fields <noreply@forresterfields.com>",
+      to: [process.env.NOTIFY_TO_EMAIL || "you@example.com"],
+      subject: "New Planner Request",
+      html,
+      text,
+    });
+
+    return NextResponse.json({ ok: true, id: data.id });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
+  }
+}
+
+
+----- FILE: src/app/api/requests/auto-age/route.ts -----
+import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+
+function admin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const key = process.env.SUPABASE_SERVICE_ROLE!;
+  return createClient(url, key, { auth: { persistSession: false } });
+}
+
+// Age threshold: default 48h; override with env AGE_NEW_TO_CONTACTED_HOURS
+const AGE_HOURS = Number(process.env.AGE_NEW_TO_CONTACTED_HOURS ?? 48);
+
+export async function GET() {
+  try {
+    const supa = admin();
+    const cutoff = new Date(Date.now() - AGE_HOURS * 60 * 60 * 1000).toISOString();
+
+    // status is null or 'new' AND created_at older than cutoff -> set to 'contacted'
+    const { data, error } = await supa
+      .from("planner_requests")
+      .update({ status: "contacted" })
+      .lte("created_at", cutoff)
+      .or("status.is.null,status.eq.new")
+      .select(); // return updated rows so we can count them
+
+    if (error) throw error;
+
+    const updated = data?.length ?? 0;
+    return NextResponse.json({ ok: true, updated, cutoff, hours: AGE_HOURS });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
+  }
+}
+
+
+----- FILE: src/app/api/requests/delete/route.ts -----
+import { NextRequest, NextResponse } from "next/server";
+import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
+
+export async function POST(req: NextRequest) {
+  try {
+    const { id } = (await req.json().catch(() => ({}))) as { id?: string };
+    const safeId = String(id ?? "").trim();
+    if (!safeId) {
+      return NextResponse.json({ ok: false, error: "Missing id" }, { status: 400 });
+    }
+
+    const supabase = getSupabaseAdmin();
+    const { error } = await supabase.from("planner_requests").delete().eq("id", safeId);
+
+    if (error) {
+      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    }
+    return NextResponse.json({ ok: true });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
+  }
+}
+
+
+----- FILE: src/app/api/requests/export/route.ts -----
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { NextResponse } from "next/server";
+import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
+
+export async function GET() {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("planner_requests")
+    .select("created_at,planner_name,email,phone,event_date,city_venue,roles_needed,status,id")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  const rows = data ?? [];
+  const header = ["created_at","planner_name","email","phone","event_date","city_venue","roles_needed","status","id"];
+  const csv = [
+    header.join(","),
+    ...rows.map(r => header.map(k => {
+      const v = (r as any)[k] ?? "";
+      const s = String(v).replace(/"/g,'""');
+      return /[",\n]/.test(s) ? `"${s}"` : s;
+    }).join(","))
+  ].join("\n");
+
+  return new NextResponse(csv, {
+    headers: {
+      "Content-Type": "text/csv",
+      "Content-Disposition": `attachment; filename="planner_requests.csv"`,
+    },
+  });
+}
+
+
+----- FILE: src/app/api/requests/update/route.ts -----
+import { NextRequest, NextResponse } from "next/server";
+import { Buffer } from "buffer";
+import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
+
+const ALLOWED = ["new","contacted","booked","archived"] as const;
+type Status = (typeof ALLOWED)[number];
+
+function checkAuth(req: NextRequest): boolean {
+  const auth = req.headers.get("authorization") || "";
+  if (!auth.startsWith("Basic ")) return false;
+  const decoded = Buffer.from(auth.slice(6), "base64").toString("utf8");
+  const [user, pass] = decoded.split(":");
+  return (
+    user === (process.env.ADMIN_USER || "") &&
+    pass === (process.env.ADMIN_PASS || "")
+  );
+}
+
+export async function POST(req: NextRequest) {
+  if (!checkAuth(req)) {
+    return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  }
+
+  const body = (await req.json()) as { id?: string; status?: Status };
+  const id = body.id ?? "";
+  const status = body.status ?? "new";
+
+  if (!id || !ALLOWED.includes(status)) {
+    return NextResponse.json(
+      { ok: false, error: "invalid id or status" },
+      { status: 400 }
+    );
+  }
+
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("planner_requests")
+    .update({ status })
+    .eq("id", id)
+    .select("id, status")
+    .maybeSingle();
+
+  if (error) {
+    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true, data });
+}
+
+
+----- FILE: src/app/api/workers/apply/route.ts -----
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { sendWorkerApplicationEmail } from "@/lib/email";
+import { NextRequest, NextResponse } from "next/server";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+
+function normalize(v: unknown): string {
+  return String(v ?? "").trim();
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+    const key = process.env.SUPABASE_SERVICE_ROLE || "";
+    if (!url || !key) {
+      return NextResponse.json(
+        { error: "Supabase environment variables are missing." },
+        { status: 500 }
+      );
+    }
+
+    const supabase = createSupabaseClient(url, key, { auth: { persistSession: false } });
+
+    const ct = (req.headers.get("content-type") || "").toLowerCase();
+    let raw: Record<string, unknown> = {};
+
+    if (ct.includes("application/json")) {
+      raw = (await req.json()) as Record<string, unknown>;
+    } else if (
+      ct.includes("multipart/form-data") ||
+      ct.includes("application/x-www-form-urlencoded")
+    ) {
+      const fd = await req.formData();
+      raw = Object.fromEntries(fd.entries());
+    }
+
+    const rolesRaw = raw.roles;
+    let roles: string[] = [];
+
+    if (Array.isArray(rolesRaw)) {
+      roles = rolesRaw.map((v) => normalize(v)).filter(Boolean);
+    } else if (typeof rolesRaw === "string") {
+      // Handle comma- or space-separated roles
+      roles = rolesRaw
+        .split(/,|\s+/)
+        .map((r) => normalize(r))
+        .filter(Boolean);
+    }
+
+    const payload = {
+      name: normalize(raw.name),
+      email: normalize(raw.email),
+      phone: normalize(raw.phone),
+      city: normalize(raw.city),
+      age: normalize(raw.age),
+      availability: normalize(raw.availability),
+      roles,
+      references_text: normalize(raw.references_text ?? raw.references),
+      experience: normalize(raw.experience),
+    };
+
+    if (!payload.name && !payload.email) {
+      return NextResponse.json({ error: "Name and Email are required." }, { status: 400 });
+    }
+
+    const { error } = await supabase.from("workers").insert([

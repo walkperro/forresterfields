@@ -21,7 +21,7 @@ export function middleware(req: NextRequest) {
     });
   }
 
-  const [inUser, inPass] = Buffer.from(encoded, "base64").toString().split(":");
+  const [inUser, inPass] = (typeof atob==="function"?atob(encoded):Buffer.from(encoded,"base64").toString()).split(":");
   if (inUser === user && inPass === pass) return NextResponse.next();
 
   return new NextResponse("Forbidden", { status: 403 });

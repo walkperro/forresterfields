@@ -1,0 +1,500 @@
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+
+----- FILE: src/app/admin/requests/page.tsx -----
+import "../admin.css";
+import CsvButton from "@/components/CsvButton";
+import "../admin-ui.css";
+import AdminNav from "@/components/AdminNav";
+import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
+import ClientTable from "./ClientTable";
+import type { PlannerRequest } from "./types";
+
+export const dynamic = "force-dynamic";
+
+async function getData(): Promise<PlannerRequest[]> {
+  const supabase = getSupabaseAdmin();
+  const { data } = await supabase
+    .from("planner_requests")
+    .select(
+      "id, created_at, planner_name, email, phone, event_date, city_venue, roles_needed, status"
+    )
+    .order("created_at", { ascending: false });
+  return (data ?? []) as PlannerRequest[];
+}
+
+export default async function Page() {
+  const rows = await getData();
+  return (
+    <div className="max-w-5xl mx-auto px-4 py-10">
+      <h1 className="font-['Playfair_Display'] text-[2rem] font-light tracking-tight text-slate-800"><span className="block mb-6">Planner Requests</span></h1>
+      <AdminNav active="requests" />
+
+      <div className="mb-4 flex items-center gap-3">
+        <CsvButton
+          rows={rows as unknown as Record<string, unknown>[]}
+          columns={[
+            { key: "created_at",  label: "Created" },
+            { key: "planner_name", label: "Planner" },
+            { key: "email",        label: "Email" },
+            { key: "phone",        label: "Phone" },
+            { key: "event_date",   label: "Event Date" },
+            { key: "city_venue",   label: "City/Venue" },
+            { key: "roles_needed", label: "Roles Needed" },
+            { key: "status",       label: "Status" }
+          ]}
+          filename={`planner-requests-${new Date().toISOString().slice(0,10)}.csv`}
+          label="Download CSV"
+        />
+      </div>
+
+      <div className="mt-6">
+        <ClientTable initialRows={rows} />
+      </div>
+    </div>
+  );
+}
+
+
+----- FILE: src/app/admin/requests/types.ts -----
+export type PlannerRequest = {
+  id: string;
+  created_at: string;
+  planner_name: string | null;
+  email: string | null;
+  phone: string | null;
+  event_date: string | null;
+  city_venue: string | null;
+  roles_needed: string | null;
+  status: "new" | "contacted" | "booked" | "archived" | null;
+};
+
+
+----- FILE: src/app/admin/workers/ClientWorkersTable.tsx -----
+"use client";
+
+import { useMemo, useState } from "react";
+import type React from "react";
+
+export type WorkerRow = {
+  id: string;
+  created_at: string;
+  name: string;
+  email: string;
+  phone: string;
+  availability: string;
+  roles: string;
+  references_text: string;
+  experience: string;
+  city: string;
+  age: string;
+  status: "new" | "contacted" | "booked" | "denied" | "available" | "unavailable";
+};
+
+const ALL_STATUSES = ["new","contacted","booked","denied","available","unavailable"] as const;
+type Status = WorkerRow["status"];
+
+function rowBg(status: Status) {
+  switch (status) {
+    case "booked":
+      return "bg-purple-50";
+    case "contacted":
+      return "bg-blue-50";
+    case "denied":
+      return "bg-rose-50";
+    case "available":
+      return "bg-green-50";
+    case "unavailable":
+      return "bg-gray-100";
+    default:
+      return "bg-yellow-50";
+  }
+}
+
+export default function ClientWorkersTable({ data }: { data: WorkerRow[] }) {
+  const [rows, setRows] = useState<WorkerRow[]>(useMemo(() => data, [data]));
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [q, setQ] = useState("");
+  const [status, setStatus] = useState<"all" | Status>("all");
+
+  const filtered = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return rows.filter((r) => {
+      const okStatus = status === "all" ? true : r.status === status;
+      if (!needle) return okStatus;
+      const hay = [
+        r.name, r.email, r.phone, r.city, r.roles, r.references_text, r.experience, r.availability,
+      ].join(" ").toLowerCase();
+      return okStatus && hay.includes(needle);
+    });
+  }, [rows, q, status]);
+
+  async function postUpdate(payload: {
+    id: string;
+    status?: Status;
+  }) {
+    const res = await fetch("/api/workers/update", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      throw new Error(j?.error || `Update failed (${res.status})`);
+    }
+  }
+
+  async function changeStatus(id: string, newStatus: Status) {
+    setBusyId(id);
+    const prev = rows;
+    try {
+      setRows((rs) => rs.map((r) => (r.id === id ? { ...r, status: newStatus } : r)));
+      await postUpdate({ id, status: newStatus });
+    } catch (e) {
+      setRows(prev);
+      alert("Failed to update status");
+      console.error((e as Error).message);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function deleteWorker(id: string) {
+    if (!confirm("Warning: This action cannot be undone. Permanently delete this applicant?")) return;
+    try {
+      setBusyId(id);
+      const res = await fetch("/api/workers/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j?.error || `Delete failed (${res.status})`);
+      }
+      setRows(prev => prev.filter(r => r.id !== id));
+    } catch (e) {
+      console.error((e as Error).message);
+      alert("Delete failed");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Controls */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search name, email, phone, city, roles..."
+          className="flex-1 border rounded-lg px-3 py-2"
+        />
+        <select
+          value={status}
+          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setStatus(e.target.value as Status)}
+          className="border rounded-lg px-3 py-2 w-full sm:w-56"
+        >
+          <option value="all">All statuses</option>
+          {ALL_STATUSES.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Table */}
+      <div className="rounded-xl border bg-white overflow-x-auto">
+        <table className="w-full text-sm min-w-[1100px]">
+          <thead className="bg-gray-50 text-gray-700">
+            <tr>
+              <th className="text-left px-4 py-3">Name</th>
+              <th className="text-left px-4 py-3">Email</th>
+              <th className="text-left px-4 py-3">Phone</th>
+              <th className="text-left px-4 py-3">City</th>
+              <th className="text-left px-4 py-3">Age</th>
+              <th className="text-left px-4 py-3">Availability</th>
+              <th className="text-left px-4 py-3">Roles</th>
+              <th className="text-left px-4 py-3">References</th>
+              <th className="text-left px-4 py-3">Experience</th>
+              <th className="text-left px-4 py-3">Status</th>
+              <th className="text-left px-4 py-3">Applied</th>
+              <th className="text-left px-4 py-3">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((r) => (
+              <tr key={r.id} className={`${rowBg(r.status)} border-t align-top`}>
+                <td className="px-4 py-3">{r.name || "—"}</td>
+                <td className="px-4 py-3">{r.email || "—"}</td>
+                <td className="px-4 py-3">{r.phone || "—"}</td>
+                <td className="px-4 py-3">{r.city || "—"}</td>
+                <td className="px-4 py-3">{r.age || "—"}</td>
+                <td className="px-4 py-3">{r.availability || "—"}</td>
+                <td className="px-4 py-3">{r.roles || "—"}</td>
+                <td className="px-4 py-3 whitespace-pre-wrap">{r.references_text || "—"}</td>
+                <td className="px-4 py-3 whitespace-pre-wrap">{r.experience || "—"}</td>
+                <td className="px-4 py-3">
+                  <select
+                    disabled={busyId === r.id}
+                    className="border rounded-md px-2 py-1 text-xs bg-white"
+                    value={r.status}
+                    onChange={(e) => changeStatus(r.id, e.target.value as Status)}
+                  >
+                    {ALL_STATUSES.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                </td>
+                <td className="px-4 py-3">
+                  {new Date(r.created_at).toLocaleString(undefined, {
+                    year: "numeric",
+                    month: "short",
+                    day: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </td>
+                <td className="px-4 py-3">
+                  <button
+                    disabled={busyId === r.id}
+                    className="px-3 py-1 rounded-md border border-red-700 text-red-800 text-xs hover:bg-red-50"
+                    onClick={() => deleteWorker(r.id)}
+                  >
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {filtered.length === 0 && (
+              <tr>
+                <td className="px-4 py-12 text-gray-500" colSpan={12}>
+                  No worker applications match your filters.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+
+----- FILE: src/app/admin/workers/page.tsx -----
+import "../admin.css";
+import CsvButton from "@/components/CsvButton";
+import "../admin-ui.css";
+import AdminNav from "@/components/AdminNav";
+import ClientWorkersTable, { WorkerRow } from "./ClientWorkersTable";
+import { createClient } from "@supabase/supabase-js";
+
+type WorkerDB = {
+  id: string;
+  created_at: string;
+  name?: string | null;
+  full_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  availability?: string | null;
+  roles?: string[] | null;
+  references_text?: string | null; // reserved-word safe
+  experience?: string | null;
+  city?: string | null;
+  age?: number | null;
+  status?: string | null; // may be legacy values like "archived"
+};
+
+function getAdmin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const key = process.env.SUPABASE_SERVICE_ROLE!;
+  return createClient(url, key, { auth: { persistSession: false } });
+}
+
+export const dynamic = "force-dynamic";
+
+async function getWorkers(): Promise<WorkerRow[]> {
+  const supabase = getAdmin();
+
+  const { data } = await supabase
+    .from("workers")
+    .select(
+      "id, created_at, name, full_name, email, phone, availability, roles, references_text, experience, city, age, status"
+    )
+    .order("created_at", { ascending: false });
+
+  const rows: WorkerDB[] = (data ?? []) as WorkerDB[];
+  return rows.map((r) => {
+    const displayName =
+      (r.full_name ?? r.name ?? "").trim() ||
+      [r.full_name, r.name].filter(Boolean).join(" ").trim();
+
+    const rolesJoined = Array.isArray(r.roles)
+      ? r.roles.join(", ")
+      : ((r.roles as unknown as string) ?? "");
+
+    // Accept the new set of statuses; remap legacy "archived" -> "denied"
+    const rawStatus = (r.status === "archived" ? "denied" : r.status) ?? "new";
+    const allowed = [
+      "new",
+      "contacted",
+      "booked",
+      "denied",
+      "available",
+      "unavailable",
+    ] as const;
+
+    const normalizedStatus: WorkerRow["status"] = (allowed as readonly string[]).includes(
+      rawStatus
+    )
+      ? (rawStatus as WorkerRow["status"])
+      : "new";
+
+    return {
+      id: r.id,
+      created_at: r.created_at,
+      name: displayName || "—",
+      email: r.email ?? "",
+      phone: r.phone ?? "",
+      availability: r.availability ?? "",
+      roles: rolesJoined,
+      references_text: r.references_text ?? "",
+      experience: r.experience ?? "",
+      city: r.city ?? "",
+      age: typeof r.age === "number" ? String(r.age) : ((r.age ?? "") as string),
+      status: normalizedStatus,
+    };
+  });
+}
+
+export default async function WorkersPage() {
+  const rows = await getWorkers();
+  return (
+    <div className="max-w-5xl mx-auto px-4 py-10">
+      <h1 className="font-['Playfair_Display'] text-[2rem] font-light tracking-tight text-slate-800 mb-6">Workers</h1>
+      <AdminNav active="workers" />
+
+      <div className="mb-4 flex items-center gap-3">
+        <CsvButton
+          rows={rows as unknown as Record<string, unknown>[]}
+          columns={[
+            { key: "created_at", label: "Created" },
+            { key: "name", label: "Name" },
+            { key: "email", label: "Email" },
+            { key: "phone", label: "Phone" },
+            { key: "city", label: "City" },
+            { key: "age", label: "Age" },
+            { key: "availability", label: "Availability" },
+            { key: "roles", label: "Roles" },
+            { key: "status", label: "Status" },
+          ]}
+          filename={`workers-\${new Date().toISOString().slice(0, 10)}.csv`}
+          label="Download CSV"
+        />
+      </div>
+
+      <div className="mt-6">
+        <ClientWorkersTable data={rows} />
+      </div>
+    </div>
+  );
+}
+
+
+----- FILE: src/app/api/apply/route.ts -----
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { NextResponse } from "next/server";
+import { supabase } from "@/lib/supabaseClient";
+
+function toArray(val: unknown): string[] | null {
+  if (!val) return null;
+  if (Array.isArray(val)) return val as string[];
+  if (typeof val === "string") {
+    return val.split(",").map(s => s.trim()).filter(Boolean);
+  }
+  return null;
+}
+
+export async function POST(req: Request) {
+  try {
+    // Accept both JSON and form submissions
+    let body: any;
+    const ctype = req.headers.get("content-type") || "";
+    if (ctype.includes("application/json")) {
+      body = await req.json();
+    } else {
+      const fd = await req.formData();
+      body = Object.fromEntries(fd as any);
+    }
+
+    // Honeypot — silently succeed for bots
+    if (body.company || body.website || body._hp) {
+      return NextResponse.json({ ok: true });
+    }
+
+    const name = (body.name ?? body.full_name ?? "").toString().trim();
+    const email = (body.email ?? "").toString().trim() || null;
+    const phone = (body.phone ?? "").toString().trim() || null;
+    const availability = (body.availability ?? "").toString().trim() || null;
+    const city = (body.city ?? "").toString().trim() || null;
+    const experience = (body.experience ?? "").toString().trim() || null;
+    const references = (body.references ?? body.refs ?? "").toString().trim() || null;
+    const roles = toArray(body.roles);
+
+    const { error } = await supabase.from("workers").insert({
+      name: name || null,
+      email,
+      phone,
+      availability,
+      city,
+      experience,
+      references,
+      roles,
+      status: "pending",
+      full_name: name || null,
+    });
+
+    if (error) {
+      console.error("supabase insert error", error);
+      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ ok: true });
+  } catch (err: any) {
+    const msg = err?.message ?? "Unknown error";
+    console.error("apply route error", err);
+    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
+  }
+}
+
+
+----- FILE: src/app/api/debug-jobs/route.ts -----
+import { NextResponse } from 'next/server';
+import { supabase } from '@/lib/supabase';
+
+export async function GET() {
+  const { data, error } = await supabase.from('jobs').select('*').order('event_date', { ascending: true });
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json(data ?? []);
+}
+
+
+----- FILE: src/app/api/debug/client/route.ts -----
+import { NextRequest, NextResponse } from "next/server";
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json().catch(() => ({}));
+    // Print to server logs (visible with `vercel logs`)
+    console.error("[CLIENT-ERROR]", JSON.stringify(body));
+    return NextResponse.json({ ok: true });
+  } catch (e) {

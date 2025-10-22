@@ -1,0 +1,500 @@
+    >
+      {label}
+    </Link>
+  );
+
+  return (
+    <div className="admin-nav flex flex-wrap gap-2 mt-4 mb-8">
+      <Item href="/admin" label="Admin Home" tab="home" />
+      <Item href="/admin/requests" label="Planner Requests" tab="requests" />
+      <Item href="/admin/workers" label="Workers" tab="workers" />
+      <Item href="/admin/jobs" label="Job Posts" tab="jobs" />
+    </div>
+  );
+}
+
+
+----- FILE: src/components/ApprovedWorkers.tsx -----
+"use client";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabaseClient";
+
+type AppRow = {
+  id: string;
+  created_at: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  city: string | null;
+  roles: string[] | null;
+  status: string;
+};
+
+export default function ApprovedWorkers() {
+  const [rows, setRows] = useState<AppRow[]>([]);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase
+      .from("applications")
+      .select("id,created_at,name,email,phone,city,roles,status")
+      .eq("status", "approved")
+      .order("created_at", { ascending: false })
+      .then(({ data, error }) =>
+        error ? setErr(error.message) : setRows(data || [])
+      );
+  }, []);
+
+  if (err) return <p className="text-red-600">Failed to load: {err}</p>;
+  if (!rows.length) return <p>No approved workers yet.</p>;
+
+  return (
+    <div className="mt-6 overflow-x-auto">
+      <table className="min-w-full text-sm">
+        <thead>
+          <tr className="text-left border-b">
+            <th className="py-2 pr-4">Name</th>
+            <th className="py-2 pr-4">Roles</th>
+            <th className="py-2 pr-4">City</th>
+            <th className="py-2 pr-4">Contact</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.id} className="border-b last:border-0">
+              <td className="py-2 pr-4">{r.name}</td>
+              <td className="py-2 pr-4">{(r.roles || []).join(", ")}</td>
+              <td className="py-2 pr-4">{r.city || ""}</td>
+              <td className="py-2 pr-4">
+                {r.email && (
+                  <a className="underline mr-2" href={`mailto:${r.email}`}>
+                    {r.email}
+                  </a>
+                )}
+                {r.phone && (
+                  <a className="underline" href={`tel:${r.phone}`}>
+                    {r.phone}
+                  </a>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="text-xs text-gray-500 mt-2">
+        Only “approved” entries are visible publicly (managed in Supabase).
+      </p>
+    </div>
+  );
+}
+
+
+----- FILE: src/components/ClientErrorForwarder.tsx -----
+"use client";
+
+import { useEffect } from "react";
+
+export default function ClientErrorForwarder() {
+  useEffect(() => {
+    const postJSON = (body: unknown) => {
+      try {
+        const json = JSON.stringify(body);
+        // Prefer sendBeacon (non-blocking); fall back to fetch
+        if (!(navigator.sendBeacon && navigator.sendBeacon("/api/client-error", new Blob([json], { type: "application/json" })))) {
+          void fetch("/api/client-error", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: json,
+          });
+        }
+      } catch {
+        // swallow
+      }
+    };
+
+    const onError = (event: ErrorEvent) => {
+      const payload = {
+        kind: "error" as const,
+        message: event.message || "Unknown error",
+        filename: event.filename,
+        lineno: event.lineno,
+        colno: event.colno,
+        stack: (event.error instanceof Error ? event.error.stack : null) ?? null,
+        userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
+      };
+      postJSON(payload);
+    };
+
+    const onRejection = (event: PromiseRejectionEvent) => {
+      const reason = event.reason;
+      const isErr = reason instanceof Error;
+      const payload = {
+        kind: "unhandledrejection" as const,
+        message: isErr ? reason.message : String(reason),
+        stack: isErr ? reason.stack ?? null : null,
+        userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
+      };
+      postJSON(payload);
+    };
+
+    window.addEventListener("error", onError);
+    window.addEventListener("unhandledrejection", onRejection);
+    return () => {
+      window.removeEventListener("error", onError);
+      window.removeEventListener("unhandledrejection", onRejection);
+    };
+  }, []);
+
+  return null;
+}
+
+
+----- FILE: src/components/CsvButton.tsx -----
+"use client";
+
+type Col = { key: string; label: string };
+
+function downloadCSV(rows: Record<string, unknown>[], cols: Col[], filename: string) {
+  const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const header = cols.map(c => esc(c.label)).join(",");
+  const body = rows.map(r => cols.map(c => esc((r as Record<string, unknown>)[c.key])).join(",")).join("\n");
+  const csv = header + "\n" + body;
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+export default function CsvButton(props: {
+  rows: Record<string, unknown>[];
+  columns: Col[];
+  filename: string;
+  className?: string;
+  label?: string;
+}) {
+  const { rows, columns, filename, className = "rounded-md border px-3 py-2 text-sm hover:bg-gray-50", label = "Download CSV" } = props;
+  return (
+    <button
+      type="button"
+      className={className}
+      onClick={() => downloadCSV(rows, columns, filename)}
+    >
+      {label}
+    </button>
+  );
+}
+
+
+----- FILE: src/components/FadeInOnView.tsx -----
+"use client";
+import { useEffect, useRef, useState } from "react";
+import { LazyMotion, domAnimation, m } from "framer-motion";
+
+export default function FadeInOnView({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisible(true);
+          obs.disconnect();
+        }
+      },
+      { rootMargin: "0px 0px -10% 0px", threshold: 0.15 }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
+  return (
+    <LazyMotion features={domAnimation}>
+      <m.div
+        ref={ref}
+        initial={{ opacity: 0, y: 18, scale: 0.995 }}
+        animate={visible ? { opacity: 1, y: 0, scale: 1 } : { opacity: 0, y: 18, scale: 0.995 }}
+        transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1], delay }}
+      >
+        {children}
+      </m.div>
+    </LazyMotion>
+  );
+}
+
+
+----- FILE: src/components/Footer.tsx -----
+export default function Footer(){
+  return (
+    <footer className="mt-16 border-t">
+      <div className="container py-10 text-sm text-gray-600">
+        <div>© {new Date().getFullYear()} Forrester Fields • Loganville, GA</div>
+        <div className="mt-2">Lakeside Weddings & Special Events</div>
+      </div>
+    </footer>
+  );
+}
+
+
+----- FILE: src/components/GalleryGrid.tsx -----
+"use client";
+
+import Image from "next/image";
+import { useState } from "react";
+import { m, LazyMotion, domAnimation } from "framer-motion";
+import type { Variants } from "framer-motion";
+import Lightbox from "./Lightbox";
+
+export type GalleryImage = string | { src: string; alt?: string };
+
+function toSrc(img: GalleryImage) {
+  return typeof img === "string" ? img : img.src;
+}
+function toAlt(img: GalleryImage, i: number) {
+  return typeof img === "string"
+    ? `Forrester Fields photo ${i + 1}`
+    : img.alt || `Forrester Fields photo ${i + 1}`;
+}
+
+// Easing & variants (typed) for smooth scroll-in
+const easeCubic: [number, number, number, number] = [0.22, 1, 0.36, 1];
+
+const container: Variants = {
+  hidden: { opacity: 1 },
+  show: {
+    opacity: 1,
+    transition: { staggerChildren: 0.06, delayChildren: 0.02 },
+  },
+};
+
+const item: Variants = {
+  hidden: { opacity: 0, y: 14, scale: 0.995 },
+  show: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: { duration: 0.35, ease: easeCubic },
+  },
+};
+
+export default function GalleryGrid({ images }: { images: GalleryImage[] }) {
+  const [open, setOpen] = useState(false);
+  const [index, setIndex] = useState(0);
+
+  // Exclude any file whose basename contains "mainbridge" or starts with "logo"
+  const filtered = images.filter((img) => {
+    const base = toSrc(img).split("/").pop()?.toLowerCase() || "";
+    if (base.includes("mainbridge")) return false;
+    if (base.startsWith("logo")) return false;
+    return true;
+  });
+
+  return (
+    <LazyMotion features={domAnimation}>
+      <>
+        <section className="mx-auto max-w-6xl px-4 pb-16">
+          {/* 2–3 column masonry; smaller cards so ~3 rows show on load */}
+          <m.div
+            className="columns-2 md:columns-3 gap-3 [column-fill:_balance]"
+            variants={container}
+            initial="hidden"
+            whileInView="show"
+            viewport={{ once: false, amount: 0.2, margin: "0px 0px -10% 0px" }}
+          >
+            {filtered.map((img, i) => {
+              const src = toSrc(img);
+              const alt = toAlt(img, i);
+              return (
+                <m.div
+                  key={src + i}
+                  variants={item}
+                  className="inline-block align-top w-full mb-3 [break-inside:avoid]"
+                >
+                  <m.button
+                    onClick={() => { setIndex(i); setOpen(true); }}
+                    className="group block w-full overflow-hidden rounded-2xl bg-white/40 ring-1 ring-black/5 hover:ring-brand-gold"
+                    aria-label={`Open photo ${i + 1}`}
+                    whileHover={{ scale: 1.01 }}
+                    transition={{ duration: 0.18 }}
+                  >
+                    <Image
+                      src={src}
+                      alt={alt}
+                      width={900}
+                      height={700}
+                      className="w-full h-auto object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                      sizes="(max-width:640px) 100vw, (max-width:1024px) 50vw, 33vw"
+                      priority={i < 2}
+                    />
+                  </m.button>
+                </m.div>
+              );
+            })}
+          </m.div>
+        </section>
+
+        {open && (
+          <Lightbox
+            images={filtered}
+            startIndex={index}
+            onClose={() => setOpen(false)}
+            onIndexChange={setIndex}
+          />
+        )}
+      </>
+    </LazyMotion>
+  );
+}
+
+
+----- FILE: src/components/HeroVideo.tsx -----
+"use client";
+import Link from "next/link";
+
+export default function HeroVideo() {
+  return (
+    <section className="relative bg-black">
+      {/* Video */}
+      <div className="mx-auto max-w-7xl">
+        <video
+          className="block w-full mx-auto object-contain max-h-[78vh] md:max-h-[82vh] transition-opacity duration-500"
+          autoPlay
+          muted
+          loop
+          playsInline
+          src="/media/forresterfields/hero.mp4"
+        />
+      </div>
+
+      {/* Text overlay */}
+      <div className="absolute inset-0 flex flex-col justify-center px-6 md:px-12 text-left">
+        <div className="pointer-events-auto text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)] max-w-3xl translate-y-[2vh] md:translate-y-[3vh]">
+          <h1 className="font-['Playfair_Display'] text-[2rem] sm:text-[2.75rem] md:text-[3.25rem] leading-snug mb-3">
+            Unforgettable Lakeside Weddings
+          </h1>
+
+          <p className="text-[0.95rem] sm:text-[1.05rem] md:text-lg text-slate-100/90 mb-6 leading-relaxed max-w-xl">
+            Private venue in Loganville serving Walton County &amp; the Greater
+            Atlanta area — full planning, month-of, and day-of coordination.
+          </p>
+
+          <div className="flex flex-wrap gap-4">
+            <Link
+              href="/contact"
+              className="rounded-md bg-emerald-800 hover:bg-emerald-700 px-6 py-3 text-base font-medium text-white shadow-md hover:shadow-lg transition-all"
+            >
+              Schedule a Tour
+            </Link>
+            <Link
+              href="/services"
+              className="rounded-md border border-white/80 hover:bg-white/10 px-6 py-3 text-base font-medium text-white backdrop-blur-[1px] transition-all"
+            >
+              View Packages
+            </Link>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+
+----- FILE: src/components/Lightbox.tsx -----
+"use client";
+
+import Image from "next/image";
+import { useEffect, useState } from "react";
+import { LazyMotion, domAnimation, m, AnimatePresence } from "framer-motion";
+import type { Variants } from "framer-motion";
+
+type ImgLike = string | { src: string; alt?: string };
+type Props = {
+  images: ImgLike[];
+  startIndex: number;
+  onClose: () => void;
+  onIndexChange: (nextIndex: number) => void;
+};
+
+const toSrc = (img: ImgLike) => (typeof img === "string" ? img : img.src);
+const toAlt = (img: ImgLike, i: number) =>
+  typeof img === "string" ? `Forrester Fields photo ${i + 1}` : img.alt || `Forrester Fields photo ${i + 1}`;
+
+/** Smooth but light crossfade (no slide) for max performance */
+const easeCubic: [number, number, number, number] = [0.22, 1, 0.36, 1];
+const crossfade: Variants = {
+  initial: { opacity: 0 },
+  enter:   { opacity: 1, transition: { duration: 0.22, ease: easeCubic } },
+  exit:    { opacity: 0, transition: { duration: 0.18, ease: easeCubic } },
+} as const;
+
+export default function Lightbox({ images, startIndex, onClose, onIndexChange }: Props) {
+  const [index, setIndex] = useState(startIndex);
+
+  // Keyboard controls
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      if (e.key === "ArrowLeft") goPrev();
+      if (e.key === "ArrowRight") goNext();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [index]); // keep deps minimal for perf
+
+  // Prefetch neighbors (browser only)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const left = (index - 1 + images.length) % images.length;
+    const right = (index + 1) % images.length;
+    [left, right].forEach((i) => {
+      const s = toSrc(images[i]);
+      const img = new window.Image();
+      img.src = s;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [index]);
+
+  const goPrev = () => {
+    const next = (index - 1 + images.length) % images.length;
+    setIndex(next);
+    onIndexChange(next);
+  };
+  const goNext = () => {
+    const next = (index + 1) % images.length;
+    setIndex(next);
+    onIndexChange(next);
+  };
+
+  const src = toSrc(images[index]);
+  const alt = toAlt(images[index], index);
+
+  return (
+    <LazyMotion features={domAnimation}>
+      {/* Single global dim background (like before) */}
+      <div
+        className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+        onClick={onClose}
+        role="dialog"
+        aria-modal="true"
+      >
+        <div className="relative w-full max-w-6xl" onClick={(e) => e.stopPropagation()}>
+          <div className="relative w-full h-[70vh] md:h-[80vh]">
+            <AnimatePresence mode="wait" initial={false}>
+              <m.div
+                key={src}
+                variants={crossfade}
+                initial="initial"
+                animate="enter"
+                exit="exit"
+                className="absolute inset-0"
+              >
+                <Image
+                  src={src}

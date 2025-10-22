@@ -1,0 +1,244 @@
+  <head><meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width"/>
+    <style>
+      body{margin:0;background:#f6f7fb;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#111}
+      .wrap{max-width:640px;margin:24px auto;padding:0 16px}
+      .card{background:#fff;border:1px solid #e6e8ee;border-radius:14px;overflow:hidden;box-shadow:0 1px 2px rgba(16,24,40,.04)}
+      .hdr{background:#123524;color:#fff;padding:20px 22px}
+      .hdr h1{font-size:18px;line-height:1.2;margin:0}
+      .body{padding:22px}
+      .row{display:flex;gap:12px;margin:10px 0}
+      .key{width:140px;color:#475467}
+      .val{flex:1;color:#101828}
+      .btn{display:inline-block;margin-top:16px;background:#184A2C;color:#fff;text-decoration:none;padding:12px 18px;border-radius:10px;font-weight:600}
+      .muted{color:#667085;font-size:12px;margin-top:18px}
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="card">
+        <div class="hdr"><h1>New Planner Request</h1></div>
+        <div class="body">
+          <div class="row"><div class="key">Planner</div><div class="val">${safe(d.planner)}</div></div>
+          <div class="row"><div class="key">Email</div><div class="val">${safe(d.email)}</div></div>
+          <div class="row"><div class="key">Phone</div><div class="val">${safe(d.phone)}</div></div>
+          <div class="row"><div class="key">Event date</div><div class="val">${safe(d.event_date)}</div></div>
+          <div class="row"><div class="key">City / Venue</div><div class="val">${safe(d.city_venue)}</div></div>
+          <div class="row"><div class="key">Roles needed</div><div class="val">${safe(d.roles_needed)}</div></div>
+          <div class="row" style="align-items:flex-start"><div class="key">Notes</div><div class="val">${noteHTML || "—"}</div></div>
+          <a class="btn" href="${btnUrl}">View in Admin</a>
+          <div class="muted">Sent from ${safe(d.siteUrl.replace(/^https?:\/\//,""))}</div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>`;
+}
+
+export function buildPlannerEmailText(d: PlannerEmailData) {
+  return [
+    `Planner: ${d.planner}`,
+    `Email: ${d.email}`,
+    `Phone: ${d.phone}`,
+    `Event date: ${d.event_date}`,
+    `City/Venue: ${d.city_venue}`,
+    `Roles needed: ${d.roles_needed}`,
+    `Notes:`,
+    d.notes || "—",
+    "",
+    `View: ${d.siteUrl}/admin/requests`,
+  ].join("\n");
+}
+
+
+----- FILE: src/lib/previews.ts -----
+import fs from "fs";
+import path from "path";
+
+/** Returns ordered list of /media/forresterfields/preview*.{jpg,png,webp} */
+export function getPreviewImages(): string[] {
+  const dir = path.join(process.cwd(), "public", "media", "forresterfields");
+  if (!fs.existsSync(dir)) return [];
+
+  const files = fs.readdirSync(dir);
+  const keep = files.filter(f =>
+    /^preview\d+\.(jpe?g|png|webp)$/i.test(f)
+  );
+
+  // natural numeric order: preview1, preview2, … preview10
+  keep.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+
+  return keep.map(f => `/media/forresterfields/${f}`);
+}
+
+
+----- FILE: src/lib/resend.ts -----
+import { Resend } from "resend";
+
+const apiKey = process.env.RESEND_API_KEY;
+if (!apiKey) {
+  throw new Error("RESEND_API_KEY is not set");
+}
+
+export const resend = new Resend(apiKey);
+export default resend;
+
+
+----- FILE: src/lib/supabase.ts -----
+import { createClient } from '@supabase/supabase-js';
+
+export const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
+
+export default supabase;
+
+
+----- FILE: src/lib/supabaseAdmin.ts -----
+import { createClient } from '@supabase/supabase-js';
+
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const serviceKey = process.env.SUPABASE_SERVICE_ROLE!;
+
+export const supabaseAdmin = createClient(url, serviceKey, {
+  auth: { persistSession: false },
+});
+
+export function getSupabaseAdmin() {
+  return supabaseAdmin;
+}
+
+export default supabaseAdmin;
+
+
+----- FILE: src/lib/supabaseClient.ts -----
+import { createClient } from "@supabase/supabase-js";
+
+export const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
+
+
+----- FILE: src/middleware.ts -----
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+
+export const config = {
+  matcher: ["/admin/:path*"],
+};
+
+export function middleware(req: NextRequest) {
+  const user = process.env.ADMIN_USER || "";
+  const pass = process.env.ADMIN_PASS || "";
+
+  // If not set, allow access (so local dev won’t block you)
+  if (!user || !pass) return NextResponse.next();
+
+  const auth = req.headers.get("authorization") || "";
+  const [scheme, encoded] = auth.split(" ");
+  if (scheme !== "Basic" || !encoded) {
+    return new NextResponse("Auth required", {
+      status: 401,
+      headers: { "WWW-Authenticate": 'Basic realm="ForresterFields Admin"' },
+    });
+  }
+
+  const [inUser, inPass] = Buffer.from(encoded, "base64").toString().split(":");
+  if (inUser === user && inPass === pass) return NextResponse.next();
+
+  return new NextResponse("Forbidden", { status: 403 });
+}
+
+
+----- FILE: package.json -----
+{
+  "name": "forresterfields",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "CHOKIDAR_USEPOLLING=1 WATCHPACK_POLLING=true NEXT_DISABLE_LIGHTNINGCSS=1 next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@react-email/render": "^1.3.2",
+    "@supabase/supabase-js": "^2.75.0",
+    "framer-motion": "^12.23.24",
+    "next": "15.5.4",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "resend": "^6.1.3"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "autoprefixer": "^10.4.21",
+    "eslint": "^9",
+    "eslint-config-next": "15.5.4",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.13",
+    "typescript": "^5"
+  }
+}
+
+
+----- FILE: next.config.js -----
+/** @type {import('next').NextConfig} */
+const isDev = process.env.NODE_ENV !== "production";
+
+const nextConfig = {
+  images: {
+    // Disable optimization locally to avoid _next/image proxy timeouts
+    unoptimized: isDev,
+    remotePatterns: [
+      { protocol: 'https', hostname: 'images.unsplash.com' },
+      { protocol: 'https', hostname: 'images.pexels.com' },
+      { protocol: 'https', hostname: 'picsum.photos' },
+    ],
+  },
+};
+module.exports = nextConfig;
+
+
+----- FILE: vercel.json -----
+{
+  "crons": [
+    { "path": "/api/requests/auto-age", "schedule": "0 0 * * *" }
+  ]
+}
+
+
+----- FILE: .gitignore -----
+node_modules/
+.next/
+.out/
+.vercel/
+.env
+.env.*
+*.mp4
+*.mov
+*.m4v
+*.webm
+*.zip
+public/media/*
+!public/media/forresterfields/**
+
+public/media/**
+
+
+----- FILE: .vercelignore -----
+.next
+node_modules
+.vercel
+.git
+.gitignore
+.env
+.env.*
+*.log
+
+
