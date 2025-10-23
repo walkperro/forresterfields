@@ -67,3 +67,75 @@ export function buildPlannerEmailText(d: PlannerEmailData) {
     `View: ${d.siteUrl}/admin/requests`,
   ].join("\n");
 }
+export type InquiryEmailData = {
+  name: string;
+  email: string;
+  phone: string;
+  event_date: string;
+  type_of_event: string;
+  type_of_event_other: string;
+  inquiry_about: string;
+  message: string;
+  siteUrl: string;
+};
+
+function safe(s: string) {
+  return (s || "").replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
+}
+
+export function buildInquiryEmailHTML(d: InquiryEmailData) {
+  const btnUrl = `${d.siteUrl}/admin/inquiries`;
+  const noteHTML = safe(d.message).replace(/\n/g,"<br>");
+  return `<!doctype html>
+<html>
+  <head><meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width"/>
+    <style>
+      body{margin:0;background:#f6f7fb;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#111}
+      .wrap{max-width:640px;margin:24px auto;padding:0 16px}
+      .card{background:#fff;border:1px solid #e6e8ee;border-radius:14px;overflow:hidden;box-shadow:0 1px 2px rgba(16,24,40,.04)}
+      .hdr{background:#123524;color:#fff;padding:20px 22px}
+      .hdr h1{font-size:18px;line-height:1.2;margin:0}
+      .body{padding:22px}
+      .row{display:flex;gap:12px;margin:10px 0}
+      .key{width:180px;color:#475467}
+      .val{flex:1;color:#101828}
+      .btn{display:inline-block;margin-top:16px;background:#184A2C;color:#fff;text-decoration:none;padding:12px 18px;border-radius:10px;font-weight:600}
+      .muted{color:#667085;font-size:12px;margin-top:18px}
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="card">
+        <div class="hdr"><h1>New Inquiry</h1></div>
+        <div class="body">
+          <div class="row"><div class="key">Name</div><div class="val">${safe(d.name)}</div></div>
+          <div class="row"><div class="key">Email</div><div class="val">${safe(d.email)}</div></div>
+          <div class="row"><div class="key">Phone</div><div class="val">${safe(d.phone)}</div></div>
+          <div class="row"><div class="key">Event date</div><div class="val">${safe(d.event_date)}</div></div>
+          <div class="row"><div class="key">Type of event</div><div class="val">${safe(d.type_of_event)} ${d.type_of_event_other ? '('+safe(d.type_of_event_other)+')' : ''}</div></div>
+          <div class="row"><div class="key">Inquiring about</div><div class="val">${safe(d.inquiry_about)}</div></div>
+          <div class="row" style="align-items:flex-start"><div class="key">Message</div><div class="val">${noteHTML || "—"}</div></div>
+          <a class="btn" href="${btnUrl}">View in Admin</a>
+          <div class="muted">Sent from ${safe(d.siteUrl.replace(/^https?:\/\//,""))}</div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>`;
+}
+
+export function buildInquiryEmailText(d: InquiryEmailData) {
+  return [
+    `Name: ${d.name}`,
+    `Email: ${d.email}`,
+    `Phone: ${d.phone}`,
+    `Event date: ${d.event_date}`,
+    `Type of event: ${d.type_of_event}${d.type_of_event_other ? " ("+d.type_of_event_other+")" : ""}`,
+    `Inquiring about: ${d.inquiry_about}`,
+    `Message:`,
+    d.message || "—",
+    "",
+    `View: ${d.siteUrl}/admin/inquiries`,
+  ].join("\n");
+}
