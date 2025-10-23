@@ -1,6 +1,9 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
+
+import "../admin-ui.css";
+import "../admin.css";
 import { useEffect, useMemo, useState } from "react";
 import AdminNav from "@/components/AdminNav";
 import { supabase } from "@/lib/supabaseClient";
@@ -89,7 +92,7 @@ export default function AdminInquiriesPage() {
   };
 
   // CSV
-  const csvCols = [
+  const csvCols: { key: string; label: string }[] = [
     { key: "created_at",   label: "Created" },
     { key: "name",         label: "Name" },
     { key: "email",        label: "Email" },
@@ -111,15 +114,15 @@ export default function AdminInquiriesPage() {
   }));
 
   return (
-    <main className="container py-12">
-      <h1 className="font-display text-4xl">Inquiries</h1>
+    <div className="max-w-5xl mx-auto px-4 py-10">
+      <h1 className="font-['Playfair_Display'] text-[2rem] font-light tracking-tight text-slate-800"><span className="block mb-6">Inquiries</span></h1>
       <AdminNav active="inquiries" />
 
       {/* Download CSV (same placement as other admin pages) */}
       <div className="mt-4">
         <CsvButton
           rows={csvRows}
-          columns={csvCols as any}
+          columns={csvCols}
           filename="inquiries.csv"
           className="rounded-md border px-3 py-2 text-sm hover:bg-gray-50"
           label="Download CSV"
@@ -225,6 +228,6 @@ export default function AdminInquiriesPage() {
           </tbody>
         </table>
       </div>
-    </main>
+    </div>
   );
 }

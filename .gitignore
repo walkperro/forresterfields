@@ -11,3 +11,4 @@ node_modules/
 *.zip
 
 # Ignore all media by default, but KEEP the gallery dir
+.vercel
