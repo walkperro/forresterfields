@@ -1,34 +1,26 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
 import { LazyMotion, domAnimation, m } from "framer-motion";
 
-export default function FadeInOnView({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
-  const ref = useRef<HTMLDivElement | null>(null);
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const obs = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setVisible(true);
-          obs.disconnect();
-        }
-      },
-      { rootMargin: "0px 0px -10% 0px", threshold: 0.15 }
-    );
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, []);
-
+/** Subtle, luxurious fade/float—similar feel to the gallery crossfades */
+export default function FadeInOnView({
+  children,
+  delay = 0,
+  className = "",
+}: {
+  children: React.ReactNode;
+  delay?: number;
+  className?: string;
+}) {
+  // softer springy-ease curve
+  const ease: [number, number, number, number] = [0.16, 1, 0.3, 1];
   return (
     <LazyMotion features={domAnimation}>
       <m.div
-        ref={ref}
-        initial={{ opacity: 0, y: 18, scale: 0.995 }}
-        animate={visible ? { opacity: 1, y: 0, scale: 1 } : { opacity: 0, y: 18, scale: 0.995 }}
-        transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1], delay }}
+        className={className}
+        initial={{ opacity: 0, y: 22 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, amount: 0.2 }}
+        transition={{ duration: 0.65, ease, delay }}
       >
         {children}
       </m.div>
