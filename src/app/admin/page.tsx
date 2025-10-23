@@ -12,6 +12,11 @@ export default function AdminIndex() {
           <div className="text-gray-600 mt-1">Review & track inbound planner requests.</div>
         </Link>
 
+        <Link href="/admin/inquiries" className="block rounded-xl border p-6 bg-white hover:bg-gray-50">
+          <div className="text-xl font-semibold">Inquiries</div>
+          <div className="text-gray-600 mt-1">View and manage new event inquiries.</div>
+        </Link>
+
         <Link href="/admin/workers" className="block rounded-xl border p-6 bg-white hover:bg-gray-50">
           <div className="text-xl font-semibold">Workers</div>
           <div className="text-gray-600 mt-1">Review applications and manage status.</div>
