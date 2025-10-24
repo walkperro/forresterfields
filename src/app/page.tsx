@@ -69,7 +69,18 @@ export default function Home() {
 
       {/* TESTIMONIALS STRIPE */}
       <FadeInOnView>
-        <TestimonialsStripe />
+        <section className="section text-center">
+          <div className="container">
+            {/* Stars moved and centered */}
+            <div className="flex justify-center mb-2 text-brand-gold text-lg">
+              {"★★★★★".split("").map((star, i) => (
+                <span key={i} className="mx-0.5">★</span>
+              ))}
+            </div>
+            <p className="text-gray-700 font-medium">Kind words from recent couples</p>
+          </div>
+          <TestimonialsStripe />
+        </section>
       </FadeInOnView>
 
       {/* GALLERY PREVIEW */}
@@ -97,7 +108,7 @@ export default function Home() {
         </FadeInOnView>
       </section>
 
-      {/* SECONDARY CTA (kept subtle at bottom) */}
+      {/* SECONDARY CTA */}
       <section className="section">
         <FadeInOnView>
           <div className="container card p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -137,6 +148,7 @@ export default function Home() {
               </p>
 
               <p className="font-semibold mt-4">I was made for this!</p>
+              <p className="italic text-gray-500 mt-1">— Marisol Forrester</p>
 
               <div className="mx-auto my-6 h-px w-24 bg-gray-200 rounded-full" />
 
