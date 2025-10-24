@@ -18,6 +18,7 @@ export default function Venue() {
 
   return (
     <main className="container py-12">
+      {/* Page intro */}
       <h1 className="font-display text-4xl sm:text-5xl md:text-6xl leading-tight text-gray-900">
         The Venue
       </h1>
@@ -25,27 +26,27 @@ export default function Venue() {
         A private lakeside property in Loganville serving Walton County and the Greater Atlanta area.
       </p>
 
-      <div className="grid gap-8 md:grid-cols-2 mt-10 items-start">
-        {/* Exact image, no cropping/zooming */}
-        <div className="w-full">
-          <Image
-            src="/media/forresterfields/venue.png"
-            alt="Forrester Fields lakeside venue"
-            width={2000}
-            height={1334}
-            priority
-            className="w-full h-auto rounded-2xl shadow-md"
-            sizes="(min-width: 768px) 50vw, 100vw"
-          />
-        </div>
+      {/* Full-width image (under title, no crop, no zoom) */}
+      <div className="relative w-screen left-1/2 right-1/2 -mx-[50vw] mt-10">
+        <Image
+          src="/media/forresterfields/venue.png"
+          alt="Forrester Fields lakeside venue"
+          width={2000}
+          height={1334}
+          priority
+          className="w-full h-auto object-contain brightness-[0.98] rounded-none"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-white/70"></div>
+      </div>
 
-        {/* Amenities */}
+      {/* Amenities */}
+      <div className="grid gap-8 md:grid-cols-2 mt-10 items-start">
         <div className="card p-6 sm:p-8 rounded-2xl shadow-sm ring-1 ring-black/5 bg-white">
           <h2 className="text-2xl font-semibold mb-4">Amenities</h2>
           <ul className="space-y-3">
             {features.map(([t, d]) => (
               <li key={t} className="flex gap-3">
-                <span className="mt-2 h-2 w-2 bg-neutral-700/80 rounded-full"></span>
+                <span className="mt-2 h-2 w-2 bg-neutral-700/70 rounded-full"></span>
                 <div>
                   <div className="font-medium text-neutral-900">{t}</div>
                   <div className="text-neutral-500 text-sm sm:text-base">{d}</div>
@@ -56,7 +57,7 @@ export default function Venue() {
           <div className="mt-8">
             <a
               href="/services"
-              className="inline-block border border-neutral-700/80 text-neutral-800 px-5 py-2.5 rounded-lg hover:bg-neutral-900 hover:text-white transition"
+              className="inline-block border border-neutral-700/70 text-neutral-800 px-5 py-2.5 rounded-lg hover:bg-neutral-900 hover:text-white transition-all duration-300"
             >
               View Packages
             </a>
@@ -64,6 +65,7 @@ export default function Venue() {
         </div>
       </div>
 
+      {/* Map */}
       <section className="mt-16">
         <h2 className="text-2xl font-display font-semibold mb-2">Find Us</h2>
         <p className="text-gray-600">
