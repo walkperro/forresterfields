@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 const EVENT_TYPES = [
@@ -16,82 +16,34 @@ const INQUIRY_ABOUT = ["Planner services", "Venue booking", "Both"] as const;
 
 export default function ClientContactForm() {
   const router = useRouter();
-  const formRef = useRef<HTMLFormElement | null>(null);
-
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [eventType, setEventType] = useState<string>(EVENT_TYPES[0]);
   const [inquire, setInquire] = useState<string>(INQUIRY_ABOUT[0]);
 
-  // Required fields (name + email). Others optional.
-  const requiredSelectors = [
-    'input[name="name"]',
-    'input[name="email"]',
-  ];
-
-  function isFilled(el: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement) {
-    if (el instanceof HTMLInputElement) {
-      if (el.type === "checkbox" || el.type === "radio") return el.checked;
-      return el.value.trim().length > 0;
-    }
-    if (el instanceof HTMLTextAreaElement) return el.value.trim().length > 0;
-    if (el instanceof HTMLSelectElement) return !!el.value;
-    return true;
-  }
-
-  function mark(el: Element, bad: boolean) {
-    if (!(el instanceof HTMLElement)) return;
-    const classes = ["ring-2","ring-red-400","border-red-500","focus:ring-red-400"];
-    if (bad) classes.forEach(c => el.classList.add(c));
-    else classes.forEach(c => el.classList.remove(c));
-    el.setAttribute("aria-invalid", bad ? "true" : "false");
-  }
-
-  function validateForm(root: HTMLElement) {
-    const missing: HTMLElement[] = [];
-    requiredSelectors.forEach(sel => {
-      const el = root.querySelector(sel) as (HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null);
-      if (!el) return;
-      const ok = isFilled(el);
-      mark(el, !ok);
-      if (!ok) missing.push(el as HTMLElement);
-      const clear = () => mark(el, !isFilled(el));
-      el.addEventListener("input", clear, { once: true });
-      el.addEventListener("change", clear, { once: true });
-    });
-    return missing;
-  }
-
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (busy) return;
-    setBusy(true);
-    setErr(null);
+    setBusy(true); setErr(null);
 
-    const form = formRef.current;
-    if (!form) return;
-
-    // client-side required validation + red rings
-    const missing = validateForm(form);
-    if (missing.length) {
-      setBusy(false);
-      missing[0].scrollIntoView({ behavior: "smooth", block: "center" });
-      (missing[0] as HTMLElement).focus?.();
-      return;
-    }
-
-    const fd = new FormData(form);
+    const fd = new FormData(e.currentTarget);
 
     const payload = {
       name: String(fd.get("name") || "").trim(),
       email: String(fd.get("email") || "").trim(),
       phone: String(fd.get("phone") || "").trim(),
-      event_date: String(fd.get("event_date") || "").trim(), // optional
+      event_date: String(fd.get("event_date") || "").trim(),
       type_of_event: eventType,
       type_of_event_other: String(fd.get("type_of_event_other") || "").trim(),
       inquiry_about: inquire,
       message: String(fd.get("message") || "").trim(),
     };
+
+    if (!payload.name || !payload.email) {
+      setErr("Please enter your name and email.");
+      setBusy(false);
+      return;
+    }
 
     try {
       const res = await fetch("/api/inquiries", {
@@ -109,14 +61,14 @@ export default function ClientContactForm() {
   }
 
   return (
-    <form ref={formRef} noValidate onSubmit={onSubmit} className="mt-8 grid gap-4 max-w-xl">
+    <form onSubmit={onSubmit} className="mt-8 grid gap-4 max-w-xl">
       {err && <div className="rounded-md border border-red-200 bg-red-50 p-3 text-red-700">{err}</div>}
 
-      <input className="border p-3 rounded-md" name="name" placeholder="Your name" />
-      <input className="border p-3 rounded-md" name="email" type="email" placeholder="Email" />
+      <input className="border p-3 rounded-md" name="name" placeholder="Your name" required />
+      <input className="border p-3 rounded-md" name="email" type="email" placeholder="Email" required />
       <input className="border p-3 rounded-md" name="phone" placeholder="Phone" />
 
-      {/* Date picker (optional) */}
+      {/* Date picker */}
       <label className="text-sm text-slate-700">Event date</label>
       <input className="border p-3 rounded-md" name="event_date" type="date" />
 
@@ -165,13 +117,7 @@ export default function ClientContactForm() {
 
       <textarea className="border p-3 rounded-md" name="message" rows={5} placeholder="Anything else we should know?" />
 
-      <button
-        type="submit"
-        disabled={busy}
-        className="border border-gray-400 text-black bg-white px-4 py-2 rounded transition-colors duration-150 shadow-sm hover:bg-gray-100 hover:shadow-md"
-      >
-        {busy ? "Sending..." : "Send"}
-      </button>
+      <button className="btn btn-primary" disabled={busy}>{busy ? "Sending..." : "Send"}</button>
     </form>
   );
 }

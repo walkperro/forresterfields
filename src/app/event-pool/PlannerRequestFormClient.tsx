@@ -146,8 +146,8 @@ export default function PlannerRequestFormClient() {
         </div>
 
         <div className="pt-1">
-          <button type="submit" disabled={status === "loading"} className="btn btn-primary">
-            {status === "loading" ? "Submitting..." : "Send request"}
+          <button type="submit" disabled={status === "loading"} className="border border-gray-400 text-black bg-white px-4 py-2 rounded transition-colors duration-150 shadow-sm hover:bg-gray-100 hover:shadow-md">
+            {status === "loading" ? "Submitting..." : "Submit Application"}
           </button>
         </div>
       </form>
