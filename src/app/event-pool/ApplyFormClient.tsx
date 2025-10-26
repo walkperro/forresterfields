@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, FormEvent } from "react";
+import { useEffect, useRef } from "react";
 
 const ROLES = [
   "Setup","Cleanup","Decorating","Greeting guests","Parking",
@@ -11,87 +11,178 @@ const ROLES = [
 
 export default function ApplyFormClient() {
   const router = useRouter();
-  const [status, setStatus] = useState<"idle"|"loading"|"error">("idle");
-  const [err, setErr] = useState<string | null>(null);
+  const formRef = useRef<HTMLFormElement | null>(null);
 
-  async function onSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setStatus("loading");
-    setErr(null);
+  // Attach validator + soft submit + redirect
+  useEffect(() => {
+    const form = formRef.current;
+    if (!form) return;
 
-    const fd = new FormData(e.currentTarget);
-    const roles = fd.getAll("roles").map(String);
+    const requiredSelectors = [
+      'input[name="name"]',
+      'input[name="email"]',
+      'input[name="phone"]',
+      'input[name="city"]',
+      'input[name="age"]',
+      'select[name="availability"]',
+      'textarea[name="experience"]',
+      'textarea[name="references_text"]'
+    ];
 
-    const payload = {
-      name: String(fd.get("name") || "").trim(),
-      email: String(fd.get("email") || "").trim(),
-      phone: String(fd.get("phone") || "").trim(),
-      city: String(fd.get("city") || "").trim(),
-      age: String(fd.get("age") || "").trim(),
-      availability: String(fd.get("availability") || "").trim(),
-      references_text: String(fd.get("references_text") || "").trim(),
-      experience: String(fd.get("experience") || "").trim(),
-      roles,
+    const isFilled = (el: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement) => {
+      if (el instanceof HTMLInputElement) {
+        if (el.type === "checkbox" || el.type === "radio") return el.checked;
+        return el.value.trim().length > 0;
+      }
+      if (el instanceof HTMLTextAreaElement) return el.value.trim().length > 0;
+      if (el instanceof HTMLSelectElement) return !!el.value;
+      return true;
     };
 
-    try {
-      const res = await fetch("/api/workers/apply", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(payload),
+    const mark = (el: Element, bad: boolean) => {
+      if (!(el instanceof HTMLElement)) return;
+      const cls = ["ring-2","ring-red-400","border-red-500","focus:ring-red-400"];
+      cls.forEach(c => el.classList[bad ? "add" : "remove"](c));
+      el.setAttribute("aria-invalid", bad ? "true" : "false");
+    };
+
+    const validate = (root: HTMLElement) => {
+      const missing: HTMLElement[] = [];
+
+      // simple requireds
+      requiredSelectors.forEach(sel => {
+        const el = root.querySelector(sel) as (HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null);
+        if (!el) return;
+        const ok = isFilled(el);
+        mark(el, !ok);
+        if (!ok) missing.push(el as HTMLElement);
+
+        const clear = () => mark(el, !isFilled(el));
+        el.addEventListener("input", clear, { once: true });
+        el.addEventListener("change", clear, { once: true });
       });
 
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}));
-        throw new Error(j?.error || `Request failed (${res.status})`);
+      // roles group: any checked
+      const roleBoxes = root.querySelectorAll('input[name="roles"], input[name="roles[]"]') as NodeListOf<HTMLInputElement>;
+      if (roleBoxes.length) {
+        const anyChecked = Array.from(roleBoxes).some(b => b.checked);
+        const anchor = roleBoxes[0];
+        mark(anchor, !anyChecked);
+        if (!anyChecked) missing.push(anchor as unknown as HTMLElement);
+        roleBoxes.forEach(b => {
+          b.addEventListener("change", () => {
+            const again = Array.from(roleBoxes).some(bb => bb.checked);
+            mark(anchor, !again);
+          }, { once: true });
+        });
       }
 
-      router.push("/event-pool/thanks");
-    } catch (e) {
-      setStatus("error");
-      setErr(e instanceof Error ? e.message : "Something went wrong.");
-    }
-  }
+      return missing;
+    };
 
+    const onSubmit = (e: SubmitEvent) => {
+      const missing = validate(form);
+      if (missing.length) {
+        e.preventDefault();
+        missing[0].scrollIntoView({ behavior: "smooth", block: "center" });
+        (missing[0] as HTMLElement).focus?.();
+        alert("Please fill in all required fields before submitting.");
+        return;
+      }
+
+      // soft submit then redirect to thanks
+      e.preventDefault();
+      const data = new FormData(form);
+      const action = form.getAttribute("action") || window.location.pathname;
+      const method = (form.getAttribute("method") || "POST").toUpperCase();
+      fetch(action, { method, body: data })
+        .then((res) => {
+          if (!res.ok) throw new Error(String(res.status));
+          router.push("/event-pool/thanks");
+        })
+        .catch(() => {
+          alert("Something went wrong. Please try again.");
+        });
+    };
+
+    form.addEventListener("submit", onSubmit);
+    return () => form.removeEventListener("submit", onSubmit);
+  }, [router]);
+
+  /* --------- UI (form) --------- */
   return (
-    <div className="mt-6">
-      {status === "error" && (
-        <div className="bg-red-100 border border-red-300 text-red-800 px-4 py-3 rounded-lg mb-4">
-          {err || "There was a problem submitting your application."}
+    <form
+      ref={formRef}
+      id="apply-form"
+      noValidate
+      className="grid gap-4 rounded-xl border p-5 bg-white"
+      method="POST"
+    >
+      <div className="grid gap-4 sm:grid-cols-2">
+        <label className="grid gap-1">
+          <span className="text-sm font-medium">Full Name*</span>
+          <input name="name" type="text" className="rounded-md border px-3 py-2" />
+        </label>
+
+        <label className="grid gap-1">
+          <span className="text-sm font-medium">Email*</span>
+          <input name="email" type="email" className="rounded-md border px-3 py-2" />
+        </label>
+
+        <label className="grid gap-1">
+          <span className="text-sm font-medium">Phone*</span>
+          <input name="phone" type="tel" className="rounded-md border px-3 py-2" />
+        </label>
+
+        <label className="grid gap-1">
+          <span className="text-sm font-medium">City*</span>
+          <input name="city" type="text" className="rounded-md border px-3 py-2" />
+        </label>
+
+        <label className="grid gap-1">
+          <span className="text-sm font-medium">Age*</span>
+          <input name="age" type="number" min="14" className="rounded-md border px-3 py-2" />
+        </label>
+
+        <label className="grid gap-1">
+          <span className="text-sm font-medium">Availability*</span>
+          <select name="availability" className="rounded-md border px-3 py-2">
+            <option value="">Select…</option>
+            <option>Weekdays</option>
+            <option>Weeknights</option>
+            <option>Weekends</option>
+            <option>Flexible</option>
+          </select>
+        </label>
+      </div>
+
+      <fieldset className="mt-2">
+        <legend className="text-sm font-medium">Roles you’re interested in* (choose at least one)</legend>
+        <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {ROLES.map((r) => (
+            <label key={r} className="flex gap-2 items-center rounded-md border px-3 py-2">
+              <input type="checkbox" name="roles" value={r} />
+              <span>{r}</span>
+            </label>
+          ))}
         </div>
-      )}
+      </fieldset>
 
-      <form onSubmit={onSubmit} className="space-y-4">
-        <input name="name" required placeholder="Full name" className="w-full border rounded-lg px-3 py-2" />
-        <input name="email" type="email" required placeholder="Email" className="w-full border rounded-lg px-3 py-2" />
-        <input name="phone" placeholder="Phone" className="w-full border rounded-lg px-3 py-2" />
-        <input name="city" placeholder="City" className="w-full border rounded-lg px-3 py-2" />
-        <input name="age" placeholder="Age" className="w-full border rounded-lg px-3 py-2" />
+      <label className="grid gap-1">
+        <span className="text-sm font-medium">Experience*</span>
+        <textarea name="experience" rows={4} className="rounded-md border px-3 py-2" />
+      </label>
 
-        <div>
-          <p className="font-medium mb-2">Roles you can do</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {ROLES.map((r) => (
-              <label key={r} className="flex items-center gap-2">
-                <input type="checkbox" name="roles" value={r} />
-                <span>{r}</span>
-              </label>
-            ))}
-          </div>
-        </div>
+      <label className="grid gap-1">
+        <span className="text-sm font-medium">References*</span>
+        <textarea name="references_text" rows={3} className="rounded-md border px-3 py-2" />
+      </label>
 
-        <textarea name="availability" placeholder="Availability" className="w-full border rounded-lg px-3 py-2 min-h-[64px]" />
-        <textarea name="references_text" placeholder="References" className="w-full border rounded-lg px-3 py-2 min-h-[64px]" />
-        <textarea name="experience" placeholder="Experience" className="w-full border rounded-lg px-3 py-2 min-h-[64px]" />
-
-        <button
-          type="submit"
-          disabled={status === "loading"}
-          className="w-full rounded-md bg-emerald-700 text-white px-4 py-2 disabled:opacity-50"
-        >
-          {status === "loading" ? "Submitting..." : "Submit"}
+      <div className="pt-2">
+        <button type="submit" className="inline-flex items-center rounded-lg border px-4 py-2 text-sm hover:bg-slate-50">
+          Submit Application
         </button>
-      </form>
-    </div>
+      </div>
+    </form>
   );
 }

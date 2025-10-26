@@ -1,0 +1,115 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useState, FormEvent, useRef, useEffect } from "react";
+
+const ROLES = [
+  "Setup","Cleanup","Decorating","Greeting guests","Parking",
+  "Passing drinks & apps","Serving food","Bartending",
+  "Bathroom attendant","Driver",
+];
+
+export default function ApplyFormClient() {
+  const router = useRouter();
+  const router = useRouter();
+  const formRef = useRef<HTMLFormElement | null>(null);
+
+  // Update these selectors to match your input/select/textarea name= values
+  const requiredSelectors = [
+    "input[name=\"name\"]",
+    "input[name=\"email\"]",
+    "input[name=\"phone\"]",
+    "input[name=\"city\"]",
+    "input[name=\"age\"]",
+    "select[name=\"availability\"]",
+    // If roles is a checkbox group, you can change this later to a group rule.
+"textarea[name=\"experience\"]",
+    "textarea[name=\"references_text\"]"
+  ];
+
+  function isFilled(el: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement) {
+    if (el instanceof HTMLInputElement) {
+      if (el.type === "checkbox" || el.type === "radio") return el.checked;
+      return el.value.trim().length > 0;
+    }
+    if (el instanceof HTMLTextAreaElement) return el.value.trim().length > 0;
+    if (el instanceof HTMLSelectElement) return !!el.value;
+    return true;
+  }
+
+  function mark(el: Element, bad: boolean) {
+    if (!(el instanceof HTMLElement)) return;
+    const on = ["ring-2","ring-red-400","border-red-500","focus:ring-red-400"];
+    if (bad) on.forEach(c => el.classList.add(c));
+    else on.forEach(c => el.classList.remove(c));
+    el.setAttribute("aria-invalid", bad ? "true" : "false");
+  }
+
+  function validateForm(root: HTMLElement) {
+  const missing: HTMLElement[] = [];
+
+  // Simple required fields
+  requiredSelectors.forEach(sel => {
+    const el = root.querySelector(sel) as (HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null);
+    if (!el) return;
+    const ok = isFilled(el);
+    mark(el, !ok);
+    if (!ok) missing.push(el as HTMLElement);
+
+    // clear red after user interacts
+    const clear = () => mark(el, !isFilled(el));
+    el.addEventListener("input", clear, { once: true });
+    el.addEventListener("change", clear, { once: true });
+  });
+
+  // GROUP RULE: at least one roles checkbox must be selected
+  const roleBoxes = root.querySelectorAll(
+    'input[name="roles"], input[name="roles[]"]'
+  ) as NodeListOf<HTMLInputElement>;
+  if (roleBoxes.length) {
+    const anyChecked = Array.from(roleBoxes).some(b => b.checked);
+    const anchor = roleBoxes[0]; // use first as the visual "anchor"
+    mark(anchor, !anyChecked);
+    if (!anyChecked) missing.push(anchor as unknown as HTMLElement);
+
+    // clear group error once any box toggles to checked
+    roleBoxes.forEach(b => {
+      b.addEventListener("change", () => {
+        const again = Array.from(roleBoxes).some(bb => bb.checked);
+        mark(anchor, !again);
+      }, { once: true });
+    });
+  }
+
+  return missing;
+}
+
+  function handleSubmit(e: React.FormEvent) {
+  const form = formRef.current;
+  if (!form) return;
+
+  const missing = validateForm(form);
+  if (missing.length) {
+    e.preventDefault();
+    missing[0].scrollIntoView({ behavior: "smooth", block: "center" });
+    (missing[0] as HTMLElement).focus?.();
+    alert("Please fill in all required fields before submitting.");
+    return;
+  }
+
+  // Submit via fetch then redirect to thanks
+  e.preventDefault();
+  const data = new FormData(form);
+  const action = form.getAttribute("action") || window.location.pathname;
+  const method = (form.getAttribute("method") || "POST").toUpperCase();
+
+  fetch(action, { method, body: data })
+    .then((res) => {
+      if (!res.ok) throw new Error(String(res.status));
+      router.push("/event-pool/thanks");
+    })
+    .catch(() => {
+      alert("Something went wrong. Please try again.");
+    });
+}
+
