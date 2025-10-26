@@ -58,26 +58,26 @@ const event_date = raw_date || null; // allow null when date not provided
 
     // Email notification to you
     const origin = req.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL || "https://forresterfields.vercel.app";
-    const html = buildPlannerEmailHTML({ planner,
+    const html = buildPlannerEmailHTML({
+      planner,
       email,
       phone,
-      event_date: (event_date || "(TBD)"),
       
       city_venue,
       roles_needed,
       notes,
       siteUrl: origin,
-     });
-    const text = buildPlannerEmailText({ planner,
+    });
+    const text = buildPlannerEmailText({
+      planner,
       email,
       phone,
-      event_date: (event_date || "(TBD)"),
       
       city_venue,
       roles_needed,
       notes,
       siteUrl: origin,
-     });
+    });
 
     // Replace this with your real inbox
     await resend.emails.send({

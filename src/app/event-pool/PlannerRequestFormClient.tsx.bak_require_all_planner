@@ -1,22 +1,20 @@
+
 "use client";
 
-import { useRef, useState } from "react";
+import { useState, FormEvent, useRef } from "react";
 import { useRouter } from "next/navigation";
 
 export default function PlannerRequestFormClient() {
   const router = useRouter();
-  const formRef = useRef<HTMLFormElement | null>(null);
   const [status, setStatus] = useState<"idle"|"loading"|"error"|"ok">("idle");
   const [err, setErr] = useState<string | null>(null);
+  const formRef = useRef<HTMLFormElement | null>(null);
 
-  // All fields we require
+  // minimal set: API only requires planner + email
   const requiredSelectors = [
     'input[name="planner"]',
     'input[name="email"]',
-    'input[name="phone"]',
-    'input[name="venue"]',
-    'input[name="roles_needed"]',
-    'textarea[name="notes"]'];
+  ];
 
   function isFilled(el: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement) {
     if (el instanceof HTMLInputElement) {
@@ -30,15 +28,14 @@ export default function PlannerRequestFormClient() {
 
   function mark(el: Element, bad: boolean) {
     if (!(el instanceof HTMLElement)) return;
-    const classes = ["ring-2","ring-red-400","border-red-500","focus:ring-red-400"];
-    if (bad) classes.forEach(c => el.classList.add(c));
-    else classes.forEach(c => el.classList.remove(c));
+    const on = ["ring-2","ring-red-400","border-red-500","focus:ring-red-400"];
+    if (bad) on.forEach(c => el.classList.add(c));
+    else on.forEach(c => el.classList.remove(c));
     el.setAttribute("aria-invalid", bad ? "true" : "false");
   }
 
   function validateForm(root: HTMLElement) {
     const missing: HTMLElement[] = [];
-
     requiredSelectors.forEach(sel => {
       const el = root.querySelector(sel) as (HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null);
       if (!el) return;
@@ -49,32 +46,31 @@ export default function PlannerRequestFormClient() {
       el.addEventListener("input", clear, { once: true });
       el.addEventListener("change", clear, { once: true });
     });
-
     return missing;
   }
 
-  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (status === "loading") return; // guard against double clicks
     setStatus("loading");
     setErr(null);
 
-    const form = formRef.current;
-    if (!form) return;
-
-    // client-side validation (adds red rings)
+    const form = formRef.current || e.currentTarget;
     const missing = validateForm(form);
     if (missing.length) {
-      setStatus("idle");
-      // focus first error
+      setStatus("error");
+      setErr("Please fill in the required fields.");
       missing[0].scrollIntoView({ behavior: "smooth", block: "center" });
       (missing[0] as HTMLElement).focus?.();
       return;
     }
 
+    const fd = new FormData(form);
     try {
-      const fd = new FormData(form);
-      // keep honeypot behavior identical
-      const res = await fetch("/api/planner-request", { method: "POST", body: fd });
+      const res = await fetch(form.getAttribute("action") || "/api/planner-request", {
+        method: "POST",
+        body: fd,
+      });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
         throw new Error(j?.error || `Request failed (${res.status})`);
@@ -120,28 +116,28 @@ export default function PlannerRequestFormClient() {
 
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="grid gap-1">
-            <label className="text-sm font-medium">Phone*</label>
+            <label className="text-sm font-medium">Phone</label>
             <input name="phone" placeholder="(###) ###-####" className="border rounded-md px-3 py-2" />
           </div>
 
           <div className="grid gap-1">
-            <label className="text-sm font-medium">Date of wedding (optional)</label>
+            <label className="text-sm font-medium">Date of wedding</label>
             <input name="event_date" type="date" className="border rounded-md px-3 py-2" />
           </div>
         </div>
 
         <div className="grid gap-1">
-          <label className="text-sm font-medium">City / Venue*</label>
+          <label className="text-sm font-medium">City / Venue</label>
           <input name="venue" placeholder="City or venue name" className="border rounded-md px-3 py-2" />
         </div>
 
         <div className="grid gap-1">
-          <label className="text-sm font-medium">Roles needed*</label>
+          <label className="text-sm font-medium">Roles needed</label>
           <input name="roles_needed" placeholder="e.g., Setup, Serving, Bartending" className="border rounded-md px-3 py-2" />
         </div>
 
         <div className="grid gap-1">
-          <label className="text-sm font-medium">Brief description*</label>
+          <label className="text-sm font-medium">Brief description</label>
           <textarea name="notes" rows={5} placeholder="Tell us about your event (timeline, headcount, special needs, etc.)" className="border rounded-md px-3 py-2" />
         </div>
 

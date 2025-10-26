@@ -14,9 +14,11 @@ export default function PlannerRequestFormClient() {
     'input[name="planner"]',
     'input[name="email"]',
     'input[name="phone"]',
+    'input[name="event_date"]',
     'input[name="venue"]',
     'input[name="roles_needed"]',
-    'textarea[name="notes"]'];
+    'textarea[name="notes"]',
+  ];
 
   function isFilled(el: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement) {
     if (el instanceof HTMLInputElement) {
@@ -125,7 +127,7 @@ export default function PlannerRequestFormClient() {
           </div>
 
           <div className="grid gap-1">
-            <label className="text-sm font-medium">Date of wedding (optional)</label>
+            <label className="text-sm font-medium">Date of wedding*</label>
             <input name="event_date" type="date" className="border rounded-md px-3 py-2" />
           </div>
         </div>

@@ -33,22 +33,15 @@ const event_date = raw_date || null; // allow null when date not provided
 
     // Insert into planner_requests
     const { data, error } = await supa
-      .from("planner_requests").insert(
-  (() => {
-    const row: Record<string, unknown> = {
- planner_name: planner,
+      .from("planner_requests").insert([{ planner_name: planner,
         email,
-        phone,      // store as text/date column as your table expects
+        phone,
+        event_date,      // store as text/date column as your table expects
         city_venue,
         roles_needed,
         notes,
         status: "new",
-       
-    };
-    if (event_date) row.event_date = event_date;
-    return row;
-  })()
-)
+       }] as any)
       .select("id")
       .single();
 
@@ -58,26 +51,26 @@ const event_date = raw_date || null; // allow null when date not provided
 
     // Email notification to you
     const origin = req.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL || "https://forresterfields.vercel.app";
-    const html = buildPlannerEmailHTML({ planner,
+    const html = buildPlannerEmailHTML({
+      planner,
       email,
       phone,
-      event_date: (event_date || "(TBD)"),
-      
+      event_date: (event_date ?? null),
       city_venue,
       roles_needed,
       notes,
       siteUrl: origin,
-     });
-    const text = buildPlannerEmailText({ planner,
+    });
+    const text = buildPlannerEmailText({
+      planner,
       email,
       phone,
-      event_date: (event_date || "(TBD)"),
-      
+      event_date: (event_date ?? null),
       city_venue,
       roles_needed,
       notes,
       siteUrl: origin,
-     });
+    });
 
     // Replace this with your real inbox
     await resend.emails.send({
