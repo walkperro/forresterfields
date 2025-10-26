@@ -59,8 +59,8 @@ export async function POST(req: NextRequest) {
     const html = buildInquiryEmailHTML({ ...payload, event_date: emailDate, siteUrl: origin });
     const text = buildInquiryEmailText({ ...payload, event_date: emailDate, siteUrl: origin });
       await resend.emails.send({
-        from: process.env.NOTIFY_FROM_EMAIL!,
-        to: [process.env.NOTIFY_TO_EMAIL! ],
+        from: "Forrester Fields <noreply@forresterfields.com>",
+        to: [process.env.NOTIFY_TO_EMAIL || "forresterfieldsweddings@gmail.com"],
         subject: "New Inquiry",
         html,
         text,

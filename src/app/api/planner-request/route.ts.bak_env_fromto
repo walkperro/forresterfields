@@ -81,8 +81,8 @@ const event_date = raw_date || null; // allow null when date not provided
 
     // Replace this with your real inbox
     await resend.emails.send({
-      from: process.env.NOTIFY_FROM_EMAIL!,
-      to: [process.env.NOTIFY_TO_EMAIL! ],
+      from: "Forrester Fields <noreply@forresterfields.com>",
+      to: [process.env.NOTIFY_TO_EMAIL || "you@example.com"],
       subject: "New Planner Request",
       html,
       text,

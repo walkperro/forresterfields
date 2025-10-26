@@ -36,7 +36,13 @@ export default function HeroVideo() {
             >
               Schedule a Tour
             </Link>
-</div>
+            <Link
+              href="/services"
+              className="rounded-md border border-white/80 hover:bg-white/10 px-6 py-3 text-base font-medium text-white backdrop-blur-[1px] transition-all"
+            >
+              View Packages
+            </Link>
+          </div>
         </div>
       </div>
     </section>

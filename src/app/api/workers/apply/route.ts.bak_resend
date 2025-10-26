@@ -23,27 +23,19 @@ export async function POST(req: NextRequest) {
 
     const ct = (req.headers.get("content-type") || "").toLowerCase();
     let raw: Record<string, unknown> = {};
-
     if (ct.includes("application/json")) {
       raw = (await req.json()) as Record<string, unknown>;
-    } else if (
-      ct.includes("multipart/form-data") ||
-      ct.includes("application/x-www-form-urlencoded")
-    ) {
+    } else {
       const fd = await req.formData();
       raw = Object.fromEntries(fd.entries());
     }
 
     const rolesRaw = raw.roles;
     let roles: string[] = [];
-
     if (Array.isArray(rolesRaw)) {
       roles = rolesRaw.map((v) => normalize(v)).filter(Boolean);
     } else if (typeof rolesRaw === "string") {
-      roles = rolesRaw
-        .split(/,|\s+/)
-        .map((r) => normalize(r))
-        .filter(Boolean);
+      roles = rolesRaw.split(/,|\s+/).map(normalize).filter(Boolean);
     }
 
     const payload = {
@@ -62,37 +54,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Name and Email are required." }, { status: 400 });
     }
 
-    // --- DEDUPE (2 mins) ---
+    // Dedupe last 2 minutes
     const dedupeSince = new Date(Date.now() - 2 * 60 * 1000).toISOString();
     let dedupeMatch = null;
     if (payload.email) {
-      const { data: existingByEmail, error: existingByEmailErr } = await supabase
+      const { data, error } = await supabase
         .from("workers")
         .select("id, created_at")
         .eq("email", payload.email)
         .gte("created_at", dedupeSince)
         .limit(1);
-      if (!existingByEmailErr && existingByEmail && existingByEmail.length) {
-        dedupeMatch = existingByEmail[0];
-      }
+      if (!error && data && data.length) dedupeMatch = data[0];
     } else if (payload.phone || payload.name) {
-      const q = supabase
-        .from("workers")
-        .select("id, created_at")
-        .gte("created_at", dedupeSince)
-        .limit(1);
-      if (payload.phone) q.eq("phone", payload.phone);
-      if (payload.name) q.eq("name", payload.name);
-      const { data: existingByNP, error: existingByNPErr } = await q;
-      if (!existingByNPErr && existingByNP && existingByNP.length) {
-        dedupeMatch = existingByNP[0];
-      }
+      let q = supabase.from("workers").select("id, created_at").gte("created_at", dedupeSince).limit(1);
+      if (payload.phone) q = q.eq("phone", payload.phone);
+      if (payload.name) q = q.eq("name", payload.name);
+      const { data, error } = await q;
+      if (!error && data && data.length) dedupeMatch = data[0];
     }
-    if (dedupeMatch) {
-      return NextResponse.json({ ok: true, deduped: true });
-    }
+    if (dedupeMatch) return NextResponse.json({ ok: true, deduped: true });
 
-    // Insert
     const { error } = await supabase.from("workers").insert([
       {
         name: payload.name,
@@ -109,39 +90,21 @@ export async function POST(req: NextRequest) {
     ]);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-    // Email (Resend SDK + env FROM/TO)
+    // pretty email via Resend
     try {
-      const origin = req.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL || "https://forresterfields.vercel.app";
-      const from = process.env.NOTIFY_FROM_EMAIL || "Forrester Fields <noreply@walkperro.com>";
-      const to = process.env.NOTIFY_TO_EMAIL || "forresterfieldsweddings@gmail.com";
-      const rolesList = Array.isArray(payload.roles) ? payload.roles.join(", ") : String(payload.roles || "");
-      const html = buildWorkerEmailHTML({
-        name: payload.name,
-        email: payload.email,
-        phone: payload.phone,
-        city: payload.city,
-        age: payload.age,
-        availability: payload.availability,
-        roles: rolesList,
-        references_text: payload.references_text || "",
-        experience: payload.experience || "",
-        siteUrl: origin,
+      const siteUrl =
+        req.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL || "https://forresterfields.vercel.app";
+      const html = buildWorkerEmailHTML({ ...payload, siteUrl });
+      const text = buildWorkerEmailText({ ...payload, siteUrl });
+      await resend.emails.send({
+        from: "Forrester Fields <noreply@forresterfields.com>",
+        to: [process.env.NOTIFY_TO_EMAIL || "forresterfieldsweddings@gmail.com"],
+        subject: "New Worker Application",
+        html,
+        text,
       });
-      const text = buildWorkerEmailText({
-        name: payload.name,
-        email: payload.email,
-        phone: payload.phone,
-        city: payload.city,
-        age: payload.age,
-        availability: payload.availability,
-        roles: rolesList,
-        references_text: payload.references_text || "",
-        experience: payload.experience || "",
-        siteUrl: origin,
-      });
-      await resend.emails.send({ from, to, subject: "New Worker Application", html, text });
-    } catch (err) {
-      console.warn("[workers email] notify failed", err);
+    } catch (e) {
+      console.warn("[workers email] failed", e);
     }
 
     return NextResponse.json({ ok: true });

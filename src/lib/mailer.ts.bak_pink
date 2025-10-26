@@ -1,0 +1,196 @@
+import { Resend } from "resend"; // (not used here, but fine to keep types compatible)
+
+/** ========== Shared ========== */
+const BRAND_BG = "#123524";
+const BTN_BG = "#184A2C";
+
+function safe(s: string) {
+  return (s || "").replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
+}
+function nl2br(s: string) {
+  return safe(s).replace(/\n/g, "<br/>");
+}
+function emailShell(title: string, siteUrl: string, inner: string) {
+  const host = siteUrl.replace(/^https?:\/\//, "");
+  const logo = `${siteUrl}/logo.png`;
+  return `<!doctype html>
+<html>
+  <head><meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width"/>
+    <style>
+      body{margin:0;background:#f6f7fb;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#111}
+      .wrap{max-width:640px;margin:24px auto;padding:0 16px}
+      .card{background:#fff;border:1px solid #e6e8ee;border-radius:14px;overflow:hidden;box-shadow:0 1px 2px rgba(16,24,40,.04)}
+      .hdr{background:${BRAND_BG};color:#fff;padding:18px 22px;display:flex;align-items:center;gap:12px}
+      .hdr img{height:28px;display:block}
+      .hdr h1{font-size:18px;line-height:1.2;margin:0}
+      .body{padding:22px}
+      .row{display:flex;gap:12px;margin:10px 0}
+      .key{width:180px;color:#475467}
+      .val{flex:1;color:#101828}
+      .btn{display:inline-block;margin-top:16px;background:${BTN_BG};color:#fff;text-decoration:none;padding:12px 18px;border-radius:10px;font-weight:600}
+      .muted{color:#667085;font-size:12px;margin-top:18px}
+      @media (max-width:520px){ .key{width:130px} }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="card">
+        <div class="hdr">
+          <img src="${logo}" alt="Forrester Fields logo" />
+          <h1>${safe(title)}</h1>
+        </div>
+        <div class="body">
+          ${inner}
+          <div class="muted">Sent from ${safe(host)}</div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>`;
+}
+
+/** ========== PLANNER ========== */
+export type PlannerEmailData = {
+  planner: string;
+  email: string;
+  phone: string;
+  event_date: string; // pass "(TBD)" if unknown
+  city_venue: string;
+  roles_needed: string;
+  notes: string;
+  siteUrl: string;
+};
+
+export function buildPlannerEmailHTML(d: PlannerEmailData) {
+  const btnUrl = `${d.siteUrl}/admin/requests`;
+  const inner = [
+    row("Planner", d.planner),
+    row("Email", d.email),
+    row("Phone", d.phone),
+    row("Event date", d.event_date),
+    row("City / Venue", d.city_venue),
+    row("Roles needed", d.roles_needed),
+    rowBlock("Notes", d.notes),
+    `<a class="btn" href="${btnUrl}">View in Admin</a>`,
+  ].join("");
+  return emailShell("New Planner Request", d.siteUrl, inner);
+}
+export function buildPlannerEmailText(d: PlannerEmailData) {
+  return [
+    `Planner: ${d.planner}`,
+    `Email: ${d.email}`,
+    `Phone: ${d.phone}`,
+    `Event date: ${d.event_date}`,
+    `City/Venue: ${d.city_venue}`,
+    `Roles needed: ${d.roles_needed}`,
+    `Notes:`,
+    d.notes || "—",
+    "",
+    `View: ${d.siteUrl}/admin/requests`,
+  ].join("\n");
+}
+
+/** ========== INQUIRY ========== */
+export type InquiryEmailData = {
+  name: string;
+  email: string;
+  phone: string;
+  event_date: string; // pass "(TBD)" if unknown
+  type_of_event: string;
+  type_of_event_other: string;
+  inquiry_about: string;
+  message: string;
+  siteUrl: string;
+};
+
+export function buildInquiryEmailHTML(d: InquiryEmailData) {
+  const btnUrl = `${d.siteUrl}/admin/inquiries`;
+  const other = d.type_of_event_other ? ` (${safe(d.type_of_event_other)})` : "";
+  const inner = [
+    row("Name", d.name),
+    row("Email", d.email),
+    row("Phone", d.phone),
+    row("Event date", d.event_date),
+    row("Type of event", `${safe(d.type_of_event)}${other}`),
+    row("Inquiring about", d.inquiry_about),
+    rowBlock("Message", d.message),
+    `<a class="btn" href="${btnUrl}">View in Admin</a>`,
+  ].join("");
+  return emailShell("New Inquiry", d.siteUrl, inner);
+}
+export function buildInquiryEmailText(d: InquiryEmailData) {
+  return [
+    `Name: ${d.name}`,
+    `Email: ${d.email}`,
+    `Phone: ${d.phone}`,
+    `Event date: ${d.event_date}`,
+    `Type of event: ${d.type_of_event}${d.type_of_event_other ? " ("+d.type_of_event_other+")" : ""}`,
+    `Inquiring about: ${d.inquiry_about}`,
+    `Message:`,
+    d.message || "—",
+    "",
+    `View: ${d.siteUrl}/admin/inquiries`,
+  ].join("\n");
+}
+
+/** ========== WORKER ========== */
+export type WorkerEmailData = {
+  name?: string;
+  email?: string;
+  phone?: string;
+  city?: string;
+  age?: string;
+  availability?: string;
+  roles?: string[]; // normalized array
+  references_text?: string;
+  experience?: string;
+  siteUrl: string;
+};
+
+export function buildWorkerEmailHTML(d: WorkerEmailData) {
+  const btnUrl = `${d.siteUrl}/admin/workers`;
+  const roles = (d.roles || []).join(", ");
+  const inner = [
+    row("Name", d.name || ""),
+    row("Email", d.email || ""),
+    row("Phone", d.phone || ""),
+    row("City", d.city || ""),
+    row("Age", d.age || ""),
+    row("Availability", d.availability || ""),
+    row("Roles", roles),
+    rowBlock("References", d.references_text || ""),
+    rowBlock("Experience", d.experience || ""),
+    `<a class="btn" href="${btnUrl}">View in Admin</a>`,
+  ].join("");
+  return emailShell("New Worker Application", d.siteUrl, inner);
+}
+export function buildWorkerEmailText(d: WorkerEmailData) {
+  const roles = (d.roles || []).join(", ");
+  return [
+    `Name: ${d.name ?? ""}`,
+    `Email: ${d.email ?? ""}`,
+    `Phone: ${d.phone ?? ""}`,
+    `City: ${d.city ?? ""}`,
+    `Age: ${d.age ?? ""}`,
+    `Availability: ${d.availability ?? ""}`,
+    `Roles: ${roles}`,
+    ``,
+    `References:`,
+    d.references_text ?? "",
+    ``,
+    `Experience:`,
+    d.experience ?? "",
+    ``,
+    `View: ${d.siteUrl}/admin/workers`,
+  ].join("\n");
+}
+
+/** helpers for rows */
+function row(label: string, val: string) {
+  return `<div class="row"><div class="key">${safe(label)}</div><div class="val">${safe(val)}</div></div>`;
+}
+function rowBlock(label: string, val: string) {
+  const html = nl2br(val || "—");
+  return `<div class="row" style="align-items:flex-start"><div class="key">${safe(label)}</div><div class="val">${html}</div></div>`;
+}
