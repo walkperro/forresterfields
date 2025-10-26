@@ -17,9 +17,40 @@ export default function ApplyFormClient() {
 
 
 
+function handleSubmit(e: React.FormEvent) {
+  const form = formRef.current;
+  if (!form) return;
 
-  const submittingRef = useRef<boolean>(false);
-const requiredSelectors = [
+  const missing = validateForm(form);
+  if (missing.length) {
+    e.preventDefault();
+    missing[0].scrollIntoView({ behavior: "smooth", block: "center" });
+    (missing[0] as HTMLElement).focus?.();
+    alert("Please fill in all required fields before submitting.");
+    return;
+  }
+
+  // Submit to API, then soft-redirect
+  e.preventDefault();
+  const data = new FormData(form);
+  const action = form.getAttribute("action") || "/api/workers/apply";
+
+  fetch(action, { method: "POST", body: data })
+    .then((res) => {
+      if (!res.ok) throw new Error(String(res.status));
+      router.push("/event-pool/thanks");
+    })
+    .catch(() => {
+      alert("Something went wrong. Please try again.");
+    });
+}
+
+// Attach validator + soft submit + redirect
+  useEffect(() => {
+    const form = formRef.current;
+    if (!form) return;
+
+    const requiredSelectors = [
       'input[name="name"]',
       'input[name="email"]',
       'input[name="phone"]',
@@ -29,29 +60,6 @@ const requiredSelectors = [
       'textarea[name="experience"]',
       'textarea[name="references_text"]'
     ];
-
-
-
-
-
-    
-function mark(el: Element, bad: boolean) {
-  if (!(el instanceof HTMLElement)) return;
-  const on = ["ring-2","ring-red-400","border-red-500","focus:ring-red-400"];
-  if (bad) on.forEach(c => el.classList.add(c));
-  else on.forEach(c => el.classList.remove(c));
-  el.setAttribute("aria-invalid", bad ? "true" : "false");
-}
-
-function isFilled(el: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement) {
-  if (el instanceof HTMLInputElement) {
-    if (el.type === "checkbox" || el.type === "radio") return el.checked;
-    return el.value.trim().length > 0;
-  }
-  if (el instanceof HTMLTextAreaElement) return el.value.trim().length > 0;
-  if (el instanceof HTMLSelectElement) return !!el.value;
-  return true;
-}
 
 function validateForm(root: HTMLElement) {
   const missing: HTMLElement[] = [];
@@ -92,54 +100,7 @@ function validateForm(root: HTMLElement) {
   return missing;
 }
 
-function handleSubmit(e: React.FormEvent) {
-  const form = formRef.current;
-  if (!form) return;
 
-  // prevent accidental double clicks / duplicate submits
-  if (submittingRef.current) {
-    e.preventDefault();
-    return;
-  }
-
-  // validate required fields first
-  const missing = validateForm(form);
-  if (missing.length) {
-    e.preventDefault();
-    missing[0].scrollIntoView({ behavior: "smooth", block: "center" });
-    (missing[0] as HTMLElement).focus?.();
-    alert("Please fill in all required fields before submitting.");
-    return;
-  }
-
-  // mark in-flight & disable button
-  e.preventDefault();
-  submittingRef.current = true;
-  const submitBtn = form.querySelector('button[type="submit"]') as HTMLButtonElement | null;
-  submitBtn?.setAttribute("disabled", "true");
-
-  const data = new FormData(form);
-  const action = form.getAttribute("action") || "/api/workers/apply";
-
-  fetch(action, { method: "POST", body: data })
-    .then((res) => {
-      if (!res.ok) throw new Error(String(res.status));
-      router.push("/event-pool/thanks");
-    })
-    .catch(() => {
-      alert("Something went wrong. Please try again.");
-    })
-    .finally(() => {
-      // re-enable only if we didn't navigate (e.g., on error)
-      submittingRef.current = false;
-      submitBtn?.removeAttribute("disabled");
-    });
-}
-
-// Attach validator + soft submit + redirect
-  useEffect(() => {
-    const form = formRef.current;
-    if (!form) return;
 
     const isFilled = (el: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement) => {
       if (el instanceof HTMLInputElement) {

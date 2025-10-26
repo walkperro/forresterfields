@@ -13,13 +13,12 @@ export default function ApplyFormClient() {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement | null>(null);
 
-  
+  // Attach validator + soft submit + redirect
+  useEffect(() => {
+    const form = formRef.current;
+    if (!form) return;
 
-
-
-
-  const submittingRef = useRef<boolean>(false);
-const requiredSelectors = [
+    const requiredSelectors = [
       'input[name="name"]',
       'input[name="email"]',
       'input[name="phone"]',
@@ -29,117 +28,6 @@ const requiredSelectors = [
       'textarea[name="experience"]',
       'textarea[name="references_text"]'
     ];
-
-
-
-
-
-    
-function mark(el: Element, bad: boolean) {
-  if (!(el instanceof HTMLElement)) return;
-  const on = ["ring-2","ring-red-400","border-red-500","focus:ring-red-400"];
-  if (bad) on.forEach(c => el.classList.add(c));
-  else on.forEach(c => el.classList.remove(c));
-  el.setAttribute("aria-invalid", bad ? "true" : "false");
-}
-
-function isFilled(el: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement) {
-  if (el instanceof HTMLInputElement) {
-    if (el.type === "checkbox" || el.type === "radio") return el.checked;
-    return el.value.trim().length > 0;
-  }
-  if (el instanceof HTMLTextAreaElement) return el.value.trim().length > 0;
-  if (el instanceof HTMLSelectElement) return !!el.value;
-  return true;
-}
-
-function validateForm(root: HTMLElement) {
-  const missing: HTMLElement[] = [];
-
-  // Simple required fields list from earlier in file
-  requiredSelectors.forEach(sel => {
-    const el = root.querySelector(sel) as (HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null);
-    if (!el) return;
-    const ok = isFilled(el);
-    mark(el, !ok);
-    if (!ok) missing.push(el as HTMLElement);
-
-    // clear error once user interacts again
-    const clear = () => mark(el, !isFilled(el));
-    el.addEventListener("input", clear, { once: true });
-    el.addEventListener("change", clear, { once: true });
-  });
-
-  // GROUP RULE: at least one roles checkbox must be selected
-  const roleBoxes = root.querySelectorAll(
-    'input[name="roles"], input[name="roles[]"]'
-  ) as NodeListOf<HTMLInputElement>;
-  if (roleBoxes.length) {
-    const anyChecked = Array.from(roleBoxes).some(b => b.checked);
-    const anchor = roleBoxes[0]; // use first as visual anchor for red ring
-    mark(anchor, !anyChecked);
-    if (!anyChecked) missing.push(anchor as unknown as HTMLElement);
-
-    // clear group error once any box toggles to checked
-    roleBoxes.forEach(b => {
-      b.addEventListener("change", () => {
-        const again = Array.from(roleBoxes).some(bb => bb.checked);
-        mark(anchor, !again);
-      }, { once: true });
-    });
-  }
-
-  return missing;
-}
-
-function handleSubmit(e: React.FormEvent) {
-  const form = formRef.current;
-  if (!form) return;
-
-  // prevent accidental double clicks / duplicate submits
-  if (submittingRef.current) {
-    e.preventDefault();
-    return;
-  }
-
-  // validate required fields first
-  const missing = validateForm(form);
-  if (missing.length) {
-    e.preventDefault();
-    missing[0].scrollIntoView({ behavior: "smooth", block: "center" });
-    (missing[0] as HTMLElement).focus?.();
-    alert("Please fill in all required fields before submitting.");
-    return;
-  }
-
-  // mark in-flight & disable button
-  e.preventDefault();
-  submittingRef.current = true;
-  const submitBtn = form.querySelector('button[type="submit"]') as HTMLButtonElement | null;
-  submitBtn?.setAttribute("disabled", "true");
-
-  const data = new FormData(form);
-  const action = form.getAttribute("action") || "/api/workers/apply";
-
-  fetch(action, { method: "POST", body: data })
-    .then((res) => {
-      if (!res.ok) throw new Error(String(res.status));
-      router.push("/event-pool/thanks");
-    })
-    .catch(() => {
-      alert("Something went wrong. Please try again.");
-    })
-    .finally(() => {
-      // re-enable only if we didn't navigate (e.g., on error)
-      submittingRef.current = false;
-      submitBtn?.removeAttribute("disabled");
-    });
-}
-
-// Attach validator + soft submit + redirect
-  useEffect(() => {
-    const form = formRef.current;
-    if (!form) return;
 
     const isFilled = (el: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement) => {
       if (el instanceof HTMLInputElement) {
@@ -223,15 +111,13 @@ function handleSubmit(e: React.FormEvent) {
 
   /* --------- UI (form) --------- */
   return (
-    
-
-<form
+    <form
       ref={formRef}
       id="apply-form"
       noValidate
       className="grid gap-4 rounded-xl border p-5 bg-white"
       method="POST"
-     action="/api/workers/apply" onSubmit={handleSubmit}>
+    >
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="grid gap-1">
           <span className="text-sm font-medium">Full Name*</span>

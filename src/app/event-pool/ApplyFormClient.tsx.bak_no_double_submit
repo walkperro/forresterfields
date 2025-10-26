@@ -17,8 +17,6 @@ export default function ApplyFormClient() {
 
 
 
-
-  const submittingRef = useRef<boolean>(false);
 const requiredSelectors = [
       'input[name="name"]',
       'input[name="email"]',
@@ -96,13 +94,6 @@ function handleSubmit(e: React.FormEvent) {
   const form = formRef.current;
   if (!form) return;
 
-  // prevent accidental double clicks / duplicate submits
-  if (submittingRef.current) {
-    e.preventDefault();
-    return;
-  }
-
-  // validate required fields first
   const missing = validateForm(form);
   if (missing.length) {
     e.preventDefault();
@@ -112,12 +103,8 @@ function handleSubmit(e: React.FormEvent) {
     return;
   }
 
-  // mark in-flight & disable button
+  // Submit to API, then soft-redirect
   e.preventDefault();
-  submittingRef.current = true;
-  const submitBtn = form.querySelector('button[type="submit"]') as HTMLButtonElement | null;
-  submitBtn?.setAttribute("disabled", "true");
-
   const data = new FormData(form);
   const action = form.getAttribute("action") || "/api/workers/apply";
 
@@ -128,11 +115,6 @@ function handleSubmit(e: React.FormEvent) {
     })
     .catch(() => {
       alert("Something went wrong. Please try again.");
-    })
-    .finally(() => {
-      // re-enable only if we didn't navigate (e.g., on error)
-      submittingRef.current = false;
-      submitBtn?.removeAttribute("disabled");
     });
 }
 
