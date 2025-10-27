@@ -1,96 +1,50 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import resend from "@/lib/resend";
 import { buildPlannerEmailHTML, buildPlannerEmailText } from "@/lib/mailer";
 
-function admin() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const key = process.env.SUPABASE_SERVICE_ROLE!;
-  return createClient(url, key, { auth: { persistSession: false } });
-}
+function norm(v: unknown) { return String(v ?? "").trim(); }
 
 export async function POST(req: NextRequest) {
   try {
-    // Accept FormData (from the planners page)
-    const fd = await req.formData();
-
-    const planner = String(fd.get("planner") ?? "").trim();
-    const email = String(fd.get("email") ?? "").trim();
-    const phone = String(fd.get("phone") ?? "").trim();
-    const raw_date = String(fd.get("event_date") ?? "").trim();
-const event_date = raw_date || null; // allow null when date not provided
- // yyyy-mm-dd from <input type="date">
-    const city_venue = String(fd.get("venue") ?? "").trim();
-    const roles_needed = String(fd.get("roles_needed") ?? "").trim();
-    const notes = String(fd.get("notes") ?? "").trim();
-
-    if (!planner || !email) {
-      return NextResponse.json({ ok: false, error: "Missing required fields" }, { status: 400 });
+    // read body (JSON or form-data)
+    const ct = (req.headers.get("content-type") || "").toLowerCase();
+    let raw: Record<string, unknown> = {};
+    if (ct.includes("application/json")) {
+      raw = await req.json();
+    } else {
+      const fd = await req.formData();
+      raw = Object.fromEntries(fd.entries());
     }
 
-    const supa = admin();
-
-    // Insert into planner_requests
-    const { data, error } = await supa
-      .from("planner_requests").insert(
-  (() => {
-    const row: Record<string, unknown> = {
- planner_name: planner,
-        email,
-        phone,      // store as text/date column as your table expects
-        city_venue,
-        roles_needed,
-        notes,
-        status: "new",
-       
+    const d = {
+      planner:     norm(raw.planner ?? raw.name),
+      email:       norm(raw.email),
+      phone:       norm(raw.phone),
+      event_date:  norm(raw.event_date ?? raw.date ?? raw.wedding_date),
+      city_venue:  norm(raw.city_venue ?? raw.city ?? raw.venue),
+      roles_needed:norm(raw.roles_needed ?? raw.roles),
+      notes:       norm(raw.notes ?? raw.description ?? raw.brief_description),
+      siteUrl:
+        req.headers.get("origin") ||
+        process.env.NEXT_PUBLIC_SITE_URL ||
+        "https://forresterfields.vercel.app",
     };
-    if (event_date) row.event_date = event_date;
-    return row;
-  })()
-)
-      .select("id")
-      .single();
 
-    if (error) {
-      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
-    }
+    const html = buildPlannerEmailHTML(d as any);
+    const text = buildPlannerEmailText(d as any);
 
-    // Email notification to you
-    const origin = req.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL || "https://forresterfields.vercel.app";
-    const html = buildPlannerEmailHTML({ planner,
-      email,
-      phone,
-      event_date: (event_date || "(TBD)"),
-      
-      city_venue,
-      roles_needed,
-      notes,
-      siteUrl: origin,
-     });
-    const text = buildPlannerEmailText({ planner,
-      email,
-      phone,
-      event_date: (event_date || "(TBD)"),
-      
-      city_venue,
-      roles_needed,
-      notes,
-      siteUrl: origin,
-     });
-
-    // Replace this with your real inbox
     await resend.emails.send({
-      from: process.env.NOTIFY_FROM_EMAIL!,
-      to: [process.env.NOTIFY_TO_EMAIL! ],
+      from: process.env.NOTIFY_FROM_EMAIL || "Forrester Fields <noreply@walkperro.com>",
+      to: process.env.NOTIFY_TO_EMAIL || "forresterfieldsweddings@gmail.com",
       subject: "New Planner Request",
       html,
       text,
     });
 
-    return NextResponse.json({ ok: true, id: data.id });
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Unknown error";
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

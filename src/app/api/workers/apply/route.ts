@@ -3,9 +3,36 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import resend from "@/lib/resend";
 import { buildWorkerEmailHTML, buildWorkerEmailText } from "@/lib/mailer";
+import fs from "fs";
+import path from "path";
 
 function normalize(v: unknown): string {
   return String(v ?? "").trim();
+}
+
+function getLogoAttachment() {
+  // Try an email-friendly logo first, then fall back to the site logo.
+  const tryPaths = [
+    "public/media/forresterfields/logo-email.png",
+    "public/media/forresterfields/logo.png",
+    "public/logo-email.png",
+    "public/logo.png",
+  ];
+  for (const p of tryPaths) {
+    const abs = path.join(process.cwd(), p);
+    if (fs.existsSync(abs)) {
+      const buf = fs.readFileSync(abs);
+      const ext = abs.endsWith(".png") ? "png" : abs.endsWith(".jpg") || abs.endsWith(".jpeg") ? "jpeg" : "png";
+      return {
+        filename: `logo.${ext}`,
+        content: buf.toString("base64"),
+        contentType: `image/${ext}`,
+        content_id: "fflogo",       // <img src="cid:fflogo">
+        disposition: "inline",
+      };
+    }
+  }
+  return undefined;
 }
 
 export async function POST(req: NextRequest) {
@@ -64,7 +91,7 @@ export async function POST(req: NextRequest) {
 
     // --- DEDUPE (2 mins) ---
     const dedupeSince = new Date(Date.now() - 2 * 60 * 1000).toISOString();
-    let dedupeMatch = null;
+    let dedupeMatch: { id: string } | null = null;
     if (payload.email) {
       const { data: existingByEmail, error: existingByEmailErr } = await supabase
         .from("workers")
@@ -73,7 +100,7 @@ export async function POST(req: NextRequest) {
         .gte("created_at", dedupeSince)
         .limit(1);
       if (!existingByEmailErr && existingByEmail && existingByEmail.length) {
-        dedupeMatch = existingByEmail[0];
+        dedupeMatch = existingByEmail[0] as { id: string };
       }
     } else if (payload.phone || payload.name) {
       const q = supabase
@@ -85,7 +112,7 @@ export async function POST(req: NextRequest) {
       if (payload.name) q.eq("name", payload.name);
       const { data: existingByNP, error: existingByNPErr } = await q;
       if (!existingByNPErr && existingByNP && existingByNP.length) {
-        dedupeMatch = existingByNP[0];
+        dedupeMatch = existingByNP[0] as { id: string };
       }
     }
     if (dedupeMatch) {
@@ -109,12 +136,16 @@ export async function POST(req: NextRequest) {
     ]);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-    // Email (Resend SDK + env FROM/TO)
+    // Email (Resend)
     try {
-      const origin = req.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL || "https://forresterfields.vercel.app";
+      const origin =
+        req.headers.get("origin") ||
+        process.env.NEXT_PUBLIC_SITE_URL ||
+        "https://forresterfields.vercel.app";
       const from = process.env.NOTIFY_FROM_EMAIL || "Forrester Fields <noreply@walkperro.com>";
       const to = process.env.NOTIFY_TO_EMAIL || "forresterfieldsweddings@gmail.com";
       const rolesList = Array.isArray(payload.roles) ? payload.roles.join(", ") : String(payload.roles || "");
+
       const html = buildWorkerEmailHTML({
         name: payload.name,
         email: payload.email,
@@ -127,6 +158,7 @@ export async function POST(req: NextRequest) {
         experience: payload.experience || "",
         siteUrl: origin,
       });
+
       const text = buildWorkerEmailText({
         name: payload.name,
         email: payload.email,
@@ -139,7 +171,16 @@ export async function POST(req: NextRequest) {
         experience: payload.experience || "",
         siteUrl: origin,
       });
-      await resend.emails.send({ from, to, subject: "New Worker Application", html, text });
+
+      const _logo = getLogoAttachment();
+
+      await resend.emails.send({
+        from,
+        to,
+        subject: "New Worker Application",
+        html,
+        text,
+      });
     } catch (err) {
       console.warn("[workers email] notify failed", err);
     }
