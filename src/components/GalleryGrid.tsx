@@ -1,40 +1,59 @@
 "use client";
-import Image from "next/image";
-import { motion } from "framer-motion";
-import type { FC } from "react";
+import { useEffect, useRef } from "react";
 
 type GalleryItem = string | { src: string; alt?: string };
 type Props = { images: GalleryItem[] };
 
-const GalleryGrid: FC<Props> = ({ images }) => {
+// ✅ Masonry layout using columns (simpler, smooth scroll, no flicker)
+export default function GalleryGrid({ images }: Props) {
+  const normalized = images.map((img) =>
+    typeof img === "string" ? { src: img, alt: "" } : img
+  );
+
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  // Soft fade-in on scroll for smoothness
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("opacity-100", "translate-y-0");
+          }
+        });
+      },
+      { threshold: 0.1 }
+    );
+    document
+      .querySelectorAll("[data-fade]")
+      .forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+  }, []);
+
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-      {images.map((item, i) => {
-        const src = typeof item === "string" ? item : item.src;
-        const alt = typeof item === "string" ? `Gallery image ${i + 1}` : (item.alt ?? `Gallery image ${i + 1}`);
-        return (
-          <motion.div
-            key={src + i}
-            initial={{ opacity: 0, y: 12 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "0px 0px -10% 0px" }}
-            transition={{ duration: 0.5, delay: i * 0.05, ease: [0.22, 1, 0.36, 1] }}
-            className="aspect-[4/3] overflow-hidden rounded-md bg-neutral-100 [content-visibility:auto] [contain:content]"
-          >
-            <Image
-              src={src}
-              alt={alt}
-              width={900}
-              height={675}
-              className="h-full w-full object-cover"
-              loading={i < 4 ? "eager" : "lazy"}
-              priority={i < 4}
-            />
-          </motion.div>
-        );
-      })}
+    <div
+      ref={containerRef}
+      className="columns-2 md:columns-3 lg:columns-4 gap-4"
+    >
+      {normalized.map((item, i) => (
+        <figure
+          key={i}
+          data-fade
+          className="
+            mb-4 break-inside-avoid overflow-hidden rounded-lg bg-neutral-100
+            shadow-sm hover:shadow-md transition-all duration-500
+            opacity-0 translate-y-4
+          "
+        >
+          <img
+            src={item.src}
+            alt={item.alt || `Gallery image ${i + 1}`}
+            className="w-full h-auto object-cover transition-transform duration-700 ease-out hover:scale-[1.02]"
+            loading={i < 4 ? 'eager' : 'lazy'}
+            decoding="async"
+          />
+        </figure>
+      ))}
     </div>
   );
-};
-
-export default GalleryGrid;
+}
