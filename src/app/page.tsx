@@ -8,7 +8,7 @@ import FadeInOnView from "@/components/FadeInOnView";
 export default function Home() {
   const PREVIEW = getPreviewImages();
   const valueProps: [string, string][] = [
-    ["Lakeside Ceremony", "Say “I do” beside the water under market lights."],
+    ["Lakeside Ceremony", "Say “I do” beside the water with a breathtaking lakeside view."],
     ["Planning to Day-Of", "From full planning to month-of and day-of coordination."],
     ["Stress-free Logistics", "Parking, dressing suites, decor, lighting, and more."],
   ];

@@ -1,29 +1,27 @@
 "use client";
-import { LazyMotion, domAnimation, m } from "framer-motion";
+import type { ReactNode } from "react";
+import { motion, useInView } from "framer-motion";
+import { useRef } from "react";
 
-/** Subtle, luxurious fade/float—similar feel to the gallery crossfades */
-export default function FadeInOnView({
-  children,
-  delay = 0,
-  className = "",
-}: {
-  children: React.ReactNode;
+type Props = {
+  children: ReactNode;
   delay?: number;
   className?: string;
-}) {
-  // softer springy-ease curve
-  const ease: [number, number, number, number] = [0.16, 1, 0.3, 1];
+};
+
+export default function FadeInOnView({ children, delay = 0, className = "" }: Props) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const inView = useInView(ref, { once: true, margin: "0px 0px -10% 0px" });
+
   return (
-    <LazyMotion features={domAnimation}>
-      <m.div
-        className={className}
-        initial={{ opacity: 0, y: 22 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, amount: 0.2 }}
-        transition={{ duration: 0.65, ease, delay }}
-      >
-        {children}
-      </m.div>
-    </LazyMotion>
+    <motion.div
+      ref={ref}
+      className={className + " transform-gpu will-change-transform"}
+      initial={{ opacity: 0, y: 16 }}
+      animate={inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 16 }}
+      transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1], delay }}
+    >
+      {children}
+    </motion.div>
   );
 }
